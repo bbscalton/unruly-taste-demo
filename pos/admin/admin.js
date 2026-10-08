@@ -1,7 +1,7 @@
 /* Unruly Taste Admin. Separate page and a separate server session from the till. */
 (function () {
   const CFG = window.UT_CONFIG || {};
-  const API = CFG.POS_API || '';
+  const API = String(CFG.ASSISTANT_API || '').replace(/\/$/, '') + '/pos/';
   const KEY = 'ut_admin_session';
   const M = window.UT_MENU;
   const $ = (id) => document.getElementById(id);
