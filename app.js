@@ -5,56 +5,18 @@
   var C = window.UT_CONFIG;
   var $ = function (id) { return document.getElementById(id); };
 
-  // ---------------- MENU (DEMO / sample; prices in GYD) ----------------
-  var FLAVOURS = ['BBQ', 'Honey Glaze', 'Lemon Pepper', 'Garlic Parmesan', 'Thai Chili', 'Jerk', 'Sweet & Spicy',
-    'Mango Habanero', 'Exotic Honey Hot Jalapeño', 'Caribbean Sunshine', 'Firecracker', 'Brown Sugar BBQ'];
-  var SIDES = ['Fries', 'Mac & Cheese', 'Waffles', 'Plantain'];
-  var PROTEIN = ['Wings', 'Strip chicken'];
-  var BOXES = ['Hot Box', 'Wrap Box'];
-  function flav(key, label, showIf) { return { key: key, label: label || 'Choose wing flavour', short: 'Flavour', opts: FLAVOURS, showIf: showIf }; }
-
-  var SECTIONS = [
-    { id: 'deals', title: '🔥 Deals' }, { id: 'wings', title: '🍗 Wings' },
-    { id: 'combos', title: '🍔 Combos' }, { id: 'boxes', title: '📦 Boxes' }
-  ];
-  // id: letters only (used in reorder links). price null = not posted (shown as "Ask", not orderable on its own).
-  var MENU = [
-    { id: 'db', sec: 'deals', name: 'Thursday Double Bubble', price: 5000, day: 4, dayName: 'Thursday', img: 'deal-thursday-double-bubble.svg',
-      desc: 'Any 2 boxes (Hot Box or Wrap Box), each with wings or strip chicken, for one price.',
-      groups: [
-        { key: 'b1', label: 'Box 1', short: 'Box 1', opts: BOXES },
-        { key: 'p1', label: 'Box 1 comes with', short: 'with', opts: PROTEIN },
-        flav('f1', 'Box 1 wing flavour', ['p1', 0]),
-        { key: 'b2', label: 'Box 2', short: 'Box 2', opts: BOXES },
-        { key: 'p2', label: 'Box 2 comes with', short: 'with', opts: PROTEIN },
-        flav('f2', 'Box 2 wing flavour', ['p2', 0])
-      ],
-      fmt: function (v) { return 'Box 1: ' + v.b1 + ' w/ ' + v.p1 + (v.f1 ? ' (' + v.f1 + ')' : '') + '; Box 2: ' + v.b2 + ' w/ ' + v.p2 + (v.f2 ? ' (' + v.f2 + ')' : ''); } },
-    { id: 'mm', sec: 'deals', name: 'Friday Mega Meal', price: 6000, day: 5, dayName: 'Friday', img: 'deal-friday-mega-meal.svg',
-      desc: '1 Hot Box + 1 Wrap Box + 2 refreshers.',
-      groups: [
-        { key: 'hp', label: 'Hot Box comes with', short: 'Hot Box with', opts: PROTEIN },
-        flav('hf', 'Hot Box wing flavour', ['hp', 0]),
-        { key: 'wp', label: 'Wrap Box comes with', short: 'Wrap Box with', opts: PROTEIN },
-        flav('wf', 'Wrap Box wing flavour', ['wp', 0])
-      ],
-      fmt: function (v) { return 'Hot Box w/ ' + v.hp + (v.hf ? ' (' + v.hf + ')' : '') + '; Wrap Box w/ ' + v.wp + (v.wf ? ' (' + v.wf + ')' : '') + '; 2 refreshers'; } },
-    { id: 'wt', sec: 'wings', name: 'Wings (12pc)', price: 2500, img: 'wings-12pc.svg',
-      desc: '12 crispy wings tossed in your choice of 12 flavours.', groups: [flav('f', 'Choose flavour')] },
-    { id: 'ws', sec: 'wings', name: 'Wings + a Side', price: 2500, img: 'wings-with-side.svg',
-      desc: 'Wings with your pick of fries, mac & cheese, waffles or plantain.',
-      groups: [flav('f', 'Choose flavour'), { key: 's', label: 'Choose your side', short: 'Side', opts: SIDES }] },
-    { id: 'wc', sec: 'combos', name: 'Wings Combo', price: 2500, img: 'wings-combo.svg',
-      desc: 'Wings + fries + mac & cheese.', groups: [flav('f', 'Choose flavour')] },
-    { id: 'bw', sec: 'combos', name: 'Burger & Wings Combo', price: 2800, img: 'burger-wings-combo.svg',
-      desc: 'Burger + wings, served with fries and dipping sauces.', groups: [flav('f')] },
-    { id: 'hb', sec: 'boxes', name: 'Hot Box', price: null, img: 'hot-box.svg',
-      desc: 'Chicken burger + fries + mac & cheese, with wings or strip chicken. Solo price confirmed on WhatsApp.',
-      groups: [{ key: 'p', label: 'Comes with', short: 'with', opts: PROTEIN }, flav('f', 'Wing flavour', ['p', 0])] },
-    { id: 'wb', sec: 'boxes', name: 'Wrap Box', price: null, img: 'wrap-box.svg',
-      desc: 'Tropical chicken wrap + fries + mac & cheese, with wings or strip chicken. Solo price confirmed on WhatsApp.',
-      groups: [{ key: 'p', label: 'Comes with', short: 'with', opts: PROTEIN }, flav('f', 'Wing flavour', ['p', 0])] }
-  ];
+  // ---------------- MENU: data lives in menu.js (shared with the voice bot) ----------------
+  var M = window.UT_MENU, LISTS = M.lists, FLAVOURS = LISTS.flavours, SECTIONS = M.sections;
+  // per-item summary formats (display only)
+  var FMT = {
+    db: function (v) { return 'Box 1: ' + v.b1 + ' w/ ' + v.p1 + (v.f1 ? ' (' + v.f1 + ')' : '') + '; Box 2: ' + v.b2 + ' w/ ' + v.p2 + (v.f2 ? ' (' + v.f2 + ')' : ''); },
+    mm: function (v) { return 'Hot Box w/ ' + v.hp + (v.hf ? ' (' + v.hf + ')' : '') + '; Wrap Box w/ ' + v.wp + (v.wf ? ' (' + v.wf + ')' : '') + '; 2 refreshers'; }
+  };
+  var MENU = M.items.map(function (it) {
+    var c = Object.assign({}, it, { fmt: FMT[it.id] });
+    c.groups = (it.groups || []).map(function (g) { return Object.assign({}, g, { opts: typeof g.opts === 'string' ? LISTS[g.opts] : g.opts }); });
+    return c;
+  });
   var BY_ID = {}; MENU.forEach(function (m) { BY_ID[m.id] = m; });
 
   // ---------------- helpers ----------------

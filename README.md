@@ -12,6 +12,10 @@ Built by Neuereatec Enterprise as a **demo**: sample menu, prices in GYD and sub
   receipt to the customer.
 - Receipt includes a reorder link (`?reorder=…`) that refills the cart.
 
+## Menu
+`menu.js` is the single source of truth for the menu (strict JSON inside). The Unruly Taste voice bot downloads it
+from the live site and builds its spoken menu from it, so page and bot stay in sync.
+
 ## Config
 `config.js` → `ORDER_WHATSAPP` (digits, with country code). **Demo value is a test line, not the business's
 number.** Swap it (and `ORDER_WHATSAPP_DISPLAY`, `DEMO: false`) once Unruly Taste approves.
