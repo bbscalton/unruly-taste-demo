@@ -9,6 +9,7 @@
 | Order sent to the order line | Opens `wa.me/<ORDER_WHATSAPP>` with the formatted order; **customer taps Send** | ⚠️ semi: customer taps Send |
 | Receipt shown to customer | Confirmation screen: Copy / Save (.txt) / Share receipt + reorder link | ✅ automatic (on screen) |
 | Receipt to customer's WhatsApp | Order message contains the receipt **and** a ready `wa.me/<customer>?text=<receipt>` link. Staff tap it, then Send | ❌ manual (1 tap + Send) |
+| Hot Box / Wrap Box (no posted solo price) | Orderable; line shows "price to confirm", order message flags ⚠️ PRICE TO CONFIRM | ⚠️ staff confirm price on WhatsApp |
 | Reorder | Receipt link `?reorder=…` refills the cart | ✅ automatic |
 
 ORDER_WHATSAPP is set in `config.js`. In this demo it is a test line, not the business's own number.

@@ -49,9 +49,11 @@
     { id: 'bw', sec: 'combos', name: 'Burger & Wings Combo', price: 2800, img: 'burger-wings-combo.svg',
       desc: 'Burger + wings, served with fries and dipping sauces.', groups: [flav('f')] },
     { id: 'hb', sec: 'boxes', name: 'Hot Box', price: null, img: 'hot-box.svg',
-      desc: 'Chicken burger + fries + mac & cheese, with wings or strip chicken.', groups: [] },
+      desc: 'Chicken burger + fries + mac & cheese, with wings or strip chicken. Solo price confirmed on WhatsApp.',
+      groups: [{ key: 'p', label: 'Comes with', short: 'with', opts: PROTEIN }, flav('f', 'Wing flavour', ['p', 0])] },
     { id: 'wb', sec: 'boxes', name: 'Wrap Box', price: null, img: 'wrap-box.svg',
-      desc: 'Tropical chicken wrap + fries + mac & cheese, with wings or strip chicken.', groups: [] }
+      desc: 'Tropical chicken wrap + fries + mac & cheese, with wings or strip chicken. Solo price confirmed on WhatsApp.',
+      groups: [{ key: 'p', label: 'Comes with', short: 'with', opts: PROTEIN }, flav('f', 'Wing flavour', ['p', 0])] }
   ];
   var BY_ID = {}; MENU.forEach(function (m) { BY_ID[m.id] = m; });
 
@@ -99,10 +101,12 @@
   }
 
   // ---------------- cart ----------------
-  var cart = (store('ut_cart') || []).filter(function (l) { return BY_ID[l.id] && BY_ID[l.id].price; });
+  var cart = (store('ut_cart') || []).filter(function (l) { return BY_ID[l.id] && Array.isArray(l.ch) && l.ch.length === BY_ID[l.id].groups.length; });
   function lineKey(l) { return l.id + ':' + l.ch.join(','); }
   function saveCart() { store('ut_cart', cart); renderCartBar(); }
-  function cartTotal() { return cart.reduce(function (s, l) { return s + BY_ID[l.id].price * l.q; }, 0); }
+  function cartTotal() { return cart.reduce(function (s, l) { return s + (BY_ID[l.id].price || 0) * l.q; }, 0); }
+  function cartHasAsk(lines) { return (lines || cart).some(function (l) { return !BY_ID[l.id].price; }); }
+  var ASK = 'price confirmed on WhatsApp';
   function cartCount() { return cart.reduce(function (s, l) { return s + l.q; }, 0); }
   function addLine(id, ch, q) {
     var nl = { id: id, ch: ch.slice(), q: q }, k = lineKey(nl);
@@ -120,7 +124,7 @@
     var out = [];
     String(s || '').split('.').forEach(function (part) {
       var m = /^([a-z]{2})-(\d{1,2})-([0-9a-z]*)$/.exec(part);
-      if (!m || !BY_ID[m[1]] || !BY_ID[m[1]].price) return;
+      if (!m || !BY_ID[m[1]]) return;
       var item = BY_ID[m[1]], q = Math.max(1, Math.min(20, parseInt(m[2], 10)));
       if (m[3].length !== item.groups.length) return;
       var ch = m[3].split('').map(function (c) { return c === 'z' ? -1 : parseInt(c, 36); });
@@ -138,13 +142,14 @@
   function renderMenu() {
     var now = gyNow(), html = '';
     SECTIONS.forEach(function (s) {
-      html += '<section class="sec" id="sec-' + s.id + '"><h2>' + s.title + '</h2><div class="grid">';
+      html += '<section class="sec" id="sec-' + s.id + '"><h2>' + s.title + '</h2>' +
+        (s.id === 'wings' ? '<p class="flv"><b>12 flavours:</b> ' + FLAVOURS.map(esc).join(' · ') + '</p>' : '') + '<div class="grid">';
       MENU.filter(function (m) { return m.sec === s.id; }).forEach(function (m) {
         var tag = m.day ? '<span class="tag' + (now.weekday === m.day ? ' today' : '') + '">' + (now.weekday === m.day ? 'TODAY' : m.dayName + 's') + '</span>' : '';
         html += '<button type="button" class="item" data-id="' + m.id + '"><img src="images/' + m.img + '" alt="' + esc(m.name) + ' (demo illustration)" loading="lazy" width="640" height="480">' +
           '<span class="t"><h3>' + esc(m.name) + tag + '</h3><p>' + esc(m.desc) + '</p><span class="pr">' +
           (m.price ? '<span class="price">' + money(m.price) + '</span><span class="addb">Add +</span>'
-                   : '<span class="price ask">Price: Ask</span><span class="addb alt">Get in a deal</span>') +
+                   : '<span class="price ask">Price on WhatsApp</span><span class="addb">Add +</span>') +
           '</span></span></button>';
       });
       html += '</div></section>';
@@ -170,17 +175,14 @@
     $('itemErr').textContent = '';
     var dn = $('itemDay');
     if (!item.price) {
-      dn.innerHTML = 'Single-box price isn\'t posted yet. Get it in a deal: <b>Thursday Double Bubble</b> (any 2 boxes for ' + money(5000) +
-        ') or <b>Friday Mega Meal</b> (Hot Box + Wrap Box + 2 refreshers for ' + money(6000) + '). Or <a href="' +
-        waLink(C.ORDER_WHATSAPP, 'Hi Unruly Taste, how much is the ' + item.name + ' on its own?') + '" target="_blank" rel="noopener">ask the price on WhatsApp</a>.';
+      dn.innerHTML = '💬 Solo price not posted yet: Unruly Taste confirms it on WhatsApp when you order. Tip: any 2 boxes = <b>' + money(5000) + '</b> on Thursdays (Double Bubble).';
       dn.classList.remove('hidden');
     } else if (item.day) {
       var w = dayWarn(item);
       dn.innerHTML = w ? '📅 ' + esc(w) + '. Unruly Taste confirms on WhatsApp.' : '✅ Today is ' + item.dayName + ': this deal is on!';
       dn.classList.remove('hidden');
     } else dn.classList.add('hidden');
-    document.querySelector('#itemModal .qtyrow').classList.toggle('hidden', !item.price);
-    renderGroups(); updateAdd();
+        renderGroups(); updateAdd();
     openModal('itemModal');
   }
   function renderGroups() {
@@ -201,13 +203,12 @@
   }
   function updateAdd() {
     $('qVal').textContent = cur.q;
-    $('addBtn').textContent = cur.item.price ? 'Add to order · ' + money(cur.item.price * cur.q) : 'See box deals';
+    $('addBtn').textContent = cur.item.price ? 'Add to order · ' + money(cur.item.price * cur.q) : 'Add to order (price on WhatsApp)';
   }
   $('qMinus').addEventListener('click', function () { cur.q = Math.max(1, cur.q - 1); updateAdd(); });
   $('qPlus').addEventListener('click', function () { cur.q = Math.min(20, cur.q + 1); updateAdd(); });
   $('addBtn').addEventListener('click', function () {
     var item = cur.item;
-    if (!item.price) { closeModal('itemModal'); document.getElementById('sec-deals').scrollIntoView({ behavior: 'smooth' }); return; }
     var miss = item.groups.filter(function (g, i) { return visible(item, g, cur.ch) && cur.ch[i] < 0; });
     if (miss.length) { $('itemErr').textContent = 'Please choose: ' + miss.map(function (g) { return g.label.replace(/^Choose /, ''); }).join(', '); return; }
     addLine(item.id, cur.ch, cur.q);
@@ -219,7 +220,7 @@
   function renderCartBar() {
     var n = cartCount();
     $('cartBar').classList.toggle('hidden', !n || !$('done').classList.contains('hidden'));
-    $('cartCount').textContent = n; $('cartTotalBar').textContent = money(cartTotal());
+    $('cartCount').textContent = n; $('cartTotalBar').textContent = money(cartTotal()) + (cartHasAsk() ? ' + TBC' : '');
   }
   function renderCart() {
     if (!cart.length) {
@@ -228,9 +229,9 @@
       $('cartLines').innerHTML = cart.map(function (l, i) {
         var it = BY_ID[l.id], s = summary(it, l.ch), w = dayWarn(it);
         return '<div class="line"><div class="ln"><b>' + esc(it.name) + '</b>' + (s ? '<small>' + esc(s) + '</small>' : '') +
-          (w ? '<small class="warn">📅 ' + esc(w) + '</small>' : '') + '<small>' + money(it.price) + ' each</small></div>' +
+          (w ? '<small class="warn">📅 ' + esc(w) + '</small>' : '') + '<small>' + (it.price ? money(it.price) + ' each' : '💬 ' + ASK) + '</small></div>' +
           '<div class="stepper"><button type="button" data-i="' + i + '" data-d="-1" aria-label="Less">' + (l.q === 1 ? '🗑' : '−') + '</button><b>' + l.q +
-          '</b><button type="button" data-i="' + i + '" data-d="1" aria-label="More">+</button></div><div class="lp">' + money(it.price * l.q) + '</div></div>';
+          '</b><button type="button" data-i="' + i + '" data-d="1" aria-label="More">+</button></div><div class="lp">' + (it.price ? money(it.price * l.q) : 'TBC') + '</div></div>';
       }).join('');
       Array.prototype.forEach.call($('cartLines').querySelectorAll('button'), function (b) {
         b.addEventListener('click', function () {
@@ -240,7 +241,7 @@
         });
       });
     }
-    $('cartTotal').textContent = money(cartTotal());
+    $('cartTotal').textContent = money(cartTotal()) + (cartHasAsk() ? ' + box price' : '');
     $('checkout').classList.toggle('hidden', !cart.length);
   }
   $('cartBar').addEventListener('click', function () { renderCart(); openModal('cartModal'); });
@@ -293,7 +294,7 @@
     var demo = C.DEMO ? ' (DEMO)' : '';
     var items = o.lines.map(function (l) {
       var it = BY_ID[l.id], s = summary(it, l.ch), w = dayWarn(it);
-      return '• ' + l.q + ' x ' + it.name + (s ? ' (' + s + ')' : '') + ': ' + money(it.price * l.q) + (w ? '\n   ↳ ' + w : '');
+      return '• ' + l.q + ' x ' + it.name + (s ? ' (' + s + ')' : '') + ': ' + (it.price ? money(it.price * l.q) : 'PRICE TO CONFIRM') + (w ? '\n   ↳ ' + w : '');
     }).join('\n');
     var ful = o.delivery
       ? 'Delivery to: ' + o.addr + (o.landmark ? ' (landmark: ' + o.landmark + ')' : '') + '\n+ delivery charge (confirmed on WhatsApp)'
@@ -306,7 +307,7 @@
       '-----',
       items,
       '-----',
-      '*Total: ' + money(o.total) + '*' + (o.delivery ? ' + delivery' : ''),
+      '*Total: ' + money(o.total) + '*' + (o.ask ? ' + box price (confirmed on WhatsApp)' : '') + (o.delivery ? ' + delivery' : ''),
       ful,
       'Pay on ' + (o.delivery ? 'delivery' : 'pickup') + '.',
       '',
@@ -329,7 +330,8 @@
       '',
       '*Items:*',
       items,
-      '*Total: ' + money(o.total) + '*' + (o.delivery ? ' + delivery charge' : ''),
+      '*Total: ' + money(o.total) + '*' + (o.ask ? ' + box price' : '') + (o.delivery ? ' + delivery charge' : ''),
+      o.ask ? '⚠️ *PRICE TO CONFIRM:* Hot Box / Wrap Box has no posted solo price. Reply to the customer with the final total.' : '',
       '',
       '===== RECEIPT FOR CUSTOMER =====',
       receipt,
@@ -356,7 +358,7 @@
     store('ut_cust', { name: name, phone: ph.display });
     var lines = cart.map(function (l) { return { id: l.id, ch: l.ch.slice(), q: l.q }; });
     var o = { no: orderNo(), when: gyNow().label, name: name, phone: ph, delivery: delivery, addr: addr, landmark: $('cLandmark').value.trim(),
-      note: $('cNote').value.trim(), lines: lines, total: cartTotal(), reorder: reorderUrl(lines) };
+      note: $('cNote').value.trim(), lines: lines, total: cartTotal(), ask: cartHasAsk(lines), reorder: reorderUrl(lines) };
     var built = buildOrder(o);
     var done = { no: o.no, receipt: built.receipt, link: built.link, reorder: o.reorder };
     try { sessionStorage.setItem('ut_done', JSON.stringify(done)); } catch (x) {}
