@@ -1,0 +1,353 @@
+/* Unruly Taste POS (DEMO). Staff-only page. Data lives on the shop PC (Unruly bot), reached through the
+ * same public API path as the ordering assistant. No keys or data in this file; staff PIN is kept in this
+ * browser only (localStorage). Menu + options come from ../menu.js (same as the ordering page). */
+(function () {
+  'use strict';
+  const CFG = window.UT_CONFIG || {}, RAW = window.UT_MENU;
+  const API = String(CFG.ASSISTANT_API || '').replace(/\/$/, '') + '/pos/';
+  const TOKEN_KEY = 'ut_pos_token';
+  const $ = (id) => document.getElementById(id);
+  const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const money = (n) => (n < 0 ? '−' : '') + 'G$' + Math.abs(Math.round(Number(n) || 0)).toLocaleString('en-US');
+  const r2 = (n) => Math.round(n * 100) / 100;
+  const pct = (p, s) => (s > 0 ? Math.round(p / s * 100) + '%' : '–');
+  const pm = (n) => '<span class="' + (n < 0 ? 'neg' : 'pos') + '">' + money(n) + '</span>';
+  const SRC = { 'walk-in': 'Walk-in', whatsapp: 'WhatsApp', web: 'Web' };
+  const BOT = { phone: 'WhatsApp call', 'web-chat': 'web chat', 'web-voice': 'web voice' };
+  const time = (iso) => new Date(iso).toLocaleTimeString('en-US', { timeZone: CFG.TIME_ZONE || 'America/Guyana', hour: 'numeric', minute: '2-digit' });
+  const dayOf = (iso) => new Date(iso).toLocaleDateString('en-CA', { timeZone: CFG.TIME_ZONE || 'America/Guyana' });
+  const today = () => dayOf(new Date().toISOString());
+
+  // ---------- menu (same resolution + summary format as the page / bot) ----------
+  const M = { ...RAW, items: RAW.items.map(it => ({ ...it, groups: (it.groups || []).map(g => ({ ...g, opts: typeof g.opts === 'string' ? RAW.lists[g.opts] : g.opts })) })) };
+  const byId = (id) => M.items.find(i => i.id === id);
+  const visible = (item, g, ch) => { if (!g.showIf) return true; const gi = item.groups.findIndex(x => x.key === g.showIf[0]); return ch[gi] === g.showIf[1]; };
+  const FMT = {
+    db: (v) => 'Box 1: ' + v.b1 + ' w/ ' + v.p1 + (v.f1 ? ' (' + v.f1 + ')' : '') + '; Box 2: ' + v.b2 + ' w/ ' + v.p2 + (v.f2 ? ' (' + v.f2 + ')' : ''),
+    mm: (v) => 'Hot Box w/ ' + v.hp + (v.hf ? ' (' + v.hf + ')' : '') + '; Wrap Box w/ ' + v.wp + (v.wf ? ' (' + v.wf + ')' : '') + '; 2 refreshers',
+  };
+  function summary(item, ch) {
+    if (!item.groups.length) return '';
+    const v = {}; item.groups.forEach((g, i) => { v[g.key] = visible(item, g, ch) && ch[i] >= 0 ? g.opts[ch[i]] : ''; });
+    if (FMT[item.id]) return FMT[item.id](v);
+    return item.groups.filter((g, i) => visible(item, g, ch) && ch[i] >= 0).map(g => (g.short === 'Flavour' ? '' : g.short + ': ') + g.opts[ch[item.groups.indexOf(g)]]).join(', ');
+  }
+
+  // ---------- state ----------
+  let D = null, tab = 'orders', fSrc = 'all', fStat = 'open', ticket = [], tendered = '', custName = '', custNote = '', pollT = null, busy = false, lastOk = 0, dirtySettings = false;
+  const ING = () => { const o = {}; (D ? D.ingredients : []).forEach(i => { o[i.id] = i; }); return o; };
+  const count = (h, n) => { if (!n) return 1; let c = 0, i = 0; while ((i = h.indexOf(n, i)) >= 0) { c++; i += n.length; } return c; };
+  function lineCost(id, choices, qty) {   // same rules as the server (lib/pos.js usage())
+    const rec = D && D.recipes[id]; if (!rec) return { cost: 0, noRecipe: true };
+    const ing = ING(); let c = 0;
+    for (const r of rec.rules) { const n = r.qty * count(choices || '', r.match) * qty; if (ing[r.ing]) c += n * ing[r.ing].costPerUnit; }
+    return { cost: Math.round(c), noRecipe: false };
+  }
+
+  // ---------- api ----------
+  async function api(action, body = {}) {
+    const r = await fetch(API + action, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...body, token: localStorage.getItem(TOKEN_KEY) || '' }) });
+    let j = {}; try { j = await r.json(); } catch {}
+    if (r.status === 401) { showLogin(j.error || 'Please sign in.'); throw new Error(j.error || 'Wrong staff PIN'); }
+    if (!r.ok || j.ok === false) throw new Error(j.error || ('HTTP ' + r.status));
+    return j;
+  }
+  function toast(t, ms = 3200) { const el = $('toast'); el.textContent = t; el.classList.remove('hidden'); clearTimeout(toast.t); toast.t = setTimeout(() => el.classList.add('hidden'), ms); }
+  async function sync(force) {
+    if (busy && !force) return;
+    try {
+      const j = await api('sync'); D = j; lastOk = Date.now();
+      $('syncState').textContent = 'live · ' + time(j.serverTime); $('syncState').className = 'sync ok';
+      renderAll();
+    } catch (e) { $('syncState').textContent = 'offline: ' + e.message.slice(0, 40); $('syncState').className = 'sync bad'; }
+  }
+  function startPoll() { clearInterval(pollT); pollT = setInterval(() => { if (!document.hidden) sync(); }, 5000); sync(true); }
+
+  // ---------- login ----------
+  function showLogin(msg) { $('login').classList.remove('hidden'); $('loginErr').textContent = msg && localStorage.getItem(TOKEN_KEY) ? msg : ''; localStorage.removeItem(TOKEN_KEY); clearInterval(pollT); setTimeout(() => $('pin').focus(), 50); }
+  $('loginForm').addEventListener('submit', async (e) => {
+    e.preventDefault(); const v = $('pin').value.trim(); if (!v) return;
+    localStorage.setItem(TOKEN_KEY, v); $('loginErr').textContent = '';
+    try { await api('auth'); $('login').classList.add('hidden'); $('pin').value = ''; startPoll(); }
+    catch (err) { $('loginErr').textContent = err.message; localStorage.removeItem(TOKEN_KEY); }
+  });
+
+  // ---------- tabs ----------
+  $('tabs').addEventListener('click', (e) => { const b = e.target.closest('button[data-tab]'); if (b) setTab(b.dataset.tab); });
+  $('bell').addEventListener('click', () => setTab('stock'));
+  function setTab(t) {
+    tab = t; document.querySelectorAll('#tabs button').forEach(b => b.classList.toggle('on', b.dataset.tab === t));
+    document.querySelectorAll('.tab').forEach(s => s.classList.toggle('hidden', s.id !== 'tab-' + t));
+    if (t !== 'settings') dirtySettings = false;
+    renderAll(true); window.scrollTo(0, 0);
+  }
+  function renderAll(forceSettings) {
+    if (!D) return;
+    const open = D.orders.filter(o => o.status !== 'collected').length, low = D.ingredients.filter(i => i.low).length;
+    $('openCount').textContent = open; $('openCount').classList.toggle('hidden', !open);
+    $('lowCount').textContent = low; $('lowCount').classList.toggle('hidden', !low);
+    $('bellCount').textContent = low; $('bellCount').classList.toggle('hidden', !low);
+    if (tab === 'orders') renderOrders();
+    else if (tab === 'walkin') renderWalkin();
+    else if (tab === 'stock') renderStock();
+    else if (tab === 'today') renderToday();
+    else if (tab === 'settings' && (forceSettings || !dirtySettings)) renderSettings();
+  }
+  const exampleNote = () => '<div class="note">🧪 <b>Example numbers:</b> ingredient costs, recipes/portions and vendors are <b>examples, Calton to supply</b> the real ones (Settings). Profit shown is an estimate from those examples.</div>';
+  const lowBar = () => { const low = D.ingredients.filter(i => i.low); return low.length ? '<div class="alertbar">⚠️ <b>Low stock:</b> ' + low.map(i => esc(i.name) + ' (' + i.stock + ' ' + esc(i.unit) + ')').join(', ') + ' · <u data-go="stock">open Stock</u></div>' : ''; };
+  document.addEventListener('click', (e) => { const g = e.target.closest('[data-go]'); if (g) setTab(g.dataset.go); });
+
+  // ---------- ORDERS ----------
+  function renderOrders() {
+    const el = $('tab-orders');
+    let list = D.orders.filter(o => (fSrc === 'all' || o.source === fSrc) && (fStat === 'all' || (fStat === 'open' ? o.status !== 'collected' : o.status === 'collected')));
+    const chip = (k, v, l) => '<button class="chip ' + (v === k ? 'on' : '') + '" data-' + l + '="' + k + '">';
+    let h = lowBar() + '<h2>Orders</h2><div class="chips">' +
+      chip('all', fSrc, 'src') + 'All</button>' + chip('walk-in', fSrc, 'src') + 'Walk-in</button>' + chip('whatsapp', fSrc, 'src') + 'WhatsApp</button>' + chip('web', fSrc, 'src') + 'Web</button></div>' +
+      '<div class="chips">' + chip('open', fStat, 'st') + 'Open</button>' + chip('collected', fStat, 'st') + 'Collected</button>' + chip('all', fStat, 'st') + 'All</button></div>';
+    if (D.settings.readyTestMode) h += '<div class="note blue">🧪 <b>Ready messages: TEST MODE.</b> Tapping <b>Ready</b> sends the "ready for pickup" WhatsApp to the shop\'s own test chat (' + esc(D.settings.ownChat) + '), labelled TEST, not to the customer. Live customer messages need Calton\'s OK.</div>';
+    h += '<p class="muted small">WhatsApp and website orders from the AI assistant appear here automatically (checked every few seconds).</p>';
+    if (!list.length) h += '<div class="empty card">No orders here yet.</div>';
+    h += '<div class="orders">' + list.map(orderCard).join('') + '</div>';
+    el.innerHTML = h;
+  }
+  function orderCard(o) {
+    const lines = o.lines.map((l, i) => '<div class="ln"><span>' + l.qty + '× ' + esc(l.name) + '</span><b>' + (l.lineTotal == null ? '<span class="neg">price TBC</span>' : money(l.lineTotal)) + '</b>' +
+      (l.choices ? '<span class="ch">' + esc(l.choices) + '</span>' : '') +
+      '<span class="cp muted">cost ' + money(l.cost) + (l.noRecipe ? ' (no recipe)' : '') + (l.profit == null ? '' : ' · profit ' + pm(l.profit)) + (l.manualPrice ? ' · <i>manual price</i>' : '') + '</span>' +
+      (l.lineTotal == null && o.status !== 'collected' ? '<span class="cp"><button class="btn sm" data-price="' + esc(o.no) + '" data-idx="' + i + '">Set ' + esc(l.name) + ' price</button></span>' : '') + '</div>').join('');
+    const who = o.source === 'walk-in' ? (o.name ? esc(o.name) : 'Counter customer') + ' · cash' + (o.cash ? ' ' + money(o.cash.tendered) + ', change ' + money(o.cash.change) : '')
+      : esc(o.name || 'Customer') + (o.number ? ' · ' + esc(o.number) : '') + ' · ' + esc(o.fulfilment) + (o.address ? ' · ' + esc(o.address) : '');
+    let acts = '';
+    if (o.status === 'new') acts = '<button class="btn" data-st="preparing" data-no="' + esc(o.no) + '">Start preparing</button>';
+    if (o.status === 'new' || o.status === 'preparing') acts += '<button class="btn green" data-ready="' + esc(o.no) + '">✅ Ready</button>';
+    if (o.status === 'ready') acts = '<button class="btn primary" data-st="collected" data-no="' + esc(o.no) + '">Collected</button>';
+    return '<div class="card order"><div class="oh"><span class="ono">' + esc(o.no) + '</span>' + (o.test ? '<span class="tag test">test</span>' : '') +
+      '<span class="tag ' + o.source + '">' + SRC[o.source] + '</span><span class="tag ' + o.status + '">' + o.status + '</span></div>' +
+      '<div class="who">' + who + '<br><span class="muted small">' + time(o.createdAt) + (dayOf(o.createdAt) !== today() ? ' · ' + dayOf(o.createdAt) : '') + (o.botSource ? ' · via ' + (BOT[o.botSource] || o.botSource) : '') + '</span></div>' +
+      (o.note ? '<div class="note">📝 ' + esc(o.note) + '</div>' : '') +
+      (o.preImport ? '<div class="muted small">Placed before the POS was switched on: stock was not deducted for this one.</div>' : '') +
+      '<div class="lines">' + lines + '</div>' +
+      '<div class="tot big"><span>Total</span><span>' + money(o.total) + (o.tbc ? ' + TBC' : '') + '</span></div>' +
+      '<div class="tot muted"><span>Est. cost (example)</span><span>' + money(o.cost) + '</span></div>' +
+      '<div class="tot"><span>Est. profit</span><span>' + pm(o.profit) + ' <span class="muted small">' + pct(o.profit, o.total) + '</span></span></div>' +
+      (o.ready ? '<div class="note blue small">Ready at ' + time(o.ready.at) + ': ' + esc(o.ready.result) + '</div>' : '') +
+      (acts ? '<div class="acts">' + acts + '</div>' : '') + '</div>';
+  }
+  $('tab-orders').addEventListener('click', async (e) => {
+    const t = e.target.closest('button'); if (!t) return;
+    if (t.dataset.src) { fSrc = t.dataset.src; return renderOrders(); }
+    if (t.dataset.st && t.dataset.no) return act('status', { no: t.dataset.no, status: t.dataset.st }, 'Order ' + t.dataset.no + ': ' + t.dataset.st);
+    if (t.dataset.ready) return readyDialog(t.dataset.ready);
+    if (t.dataset.price) return priceDialog(t.dataset.price, +t.dataset.idx);
+  });
+  $('tab-orders').addEventListener('click', (e) => { const t = e.target.closest('button[data-st]:not([data-no])'); if (t) { fStat = t.dataset.st; renderOrders(); } });
+  async function act(action, body, okMsg) {
+    busy = true;
+    try { const j = await api(action, body); toast(okMsg); await sync(true); return j; }
+    catch (e) { toast('⚠️ ' + e.message, 5000); return null; } finally { busy = false; }
+  }
+  function fill(tpl, o) { return String(tpl || '').replace(/\{name\}/g, (o.name || 'there').split(' ')[0]).replace(/\{no\}/g, o.no).replace(/\{total\}/g, money(o.total) + (o.tbc ? ' + box price' : '')); }
+  function readyDialog(no) {
+    const o = D.orders.find(x => x.no === no); if (!o) return;
+    const msg = fill(o.fulfilment === 'delivery' ? D.settings.readyTextDelivery : D.settings.readyText, o);
+    let what;
+    if (o.source === 'walk-in') what = '<div class="note">Walk-in order: no WhatsApp message. Call the customer at the counter.</div>';
+    else if (D.settings.readyTestMode) what = '<div class="note blue">🧪 <b>TEST MODE:</b> this message goes to the shop\'s own test chat (' + esc(D.settings.ownChat) + ') labelled TEST, <b>not</b> to the customer (' + esc(o.number || 'no number') + ').</div><div class="preview">' + esc(msg) + '</div>';
+    else what = '<div class="note">This sends the WhatsApp below to the customer (' + esc(o.number) + '), only if their number was confirmed on the call.</div><div class="preview">' + esc(msg) + '</div>';
+    openSheet('<h3>Mark ' + esc(no) + ' ready?</h3><p class="muted small">' + esc(o.name || 'Customer') + ' · ' + SRC[o.source] + ' · ' + money(o.total) + '</p>' + what +
+      '<div class="acts"><button class="btn" data-close>Cancel</button><button class="btn green" id="confirmReady">Yes, it\'s ready</button></div>');
+    $('confirmReady').onclick = async () => { $('confirmReady').disabled = true; const j = await act('ready', { no, confirm: true }, 'Order ' + no + ' is ready'); closeSheet(); if (j && j.order && j.order.ready) toast('✅ ' + no + ' ready · ' + j.order.ready.result, 6000); };
+  }
+  function priceDialog(no, idx) {
+    const o = D.orders.find(x => x.no === no); const l = o && o.lines[idx]; if (!l) return;
+    openSheet('<h3>Price for ' + esc(l.name) + '</h3><p class="muted small">' + esc(no) + ' · ' + l.qty + '× · ' + esc(l.choices) + '</p><p class="small">No posted solo price on the menu. Enter the price per box you charged.</p>' +
+      '<div class="field"><label>Price per box (G$)</label><input id="pp" type="number" inputmode="numeric" min="1" placeholder="e.g. 3000"></div><div class="acts"><button class="btn" data-close>Cancel</button><button class="btn primary" id="ppOk">Save price</button></div>');
+    $('pp').focus(); $('ppOk').onclick = async () => { const p = +$('pp').value; if (!(p > 0)) return toast('Enter a price'); await act('price', { no, idx, price: p }, 'Price saved'); closeSheet(); };
+  }
+
+  // ---------- sheet ----------
+  function openSheet(html) { $('sheetPanel').innerHTML = html; $('sheet').classList.remove('hidden'); }
+  function closeSheet() { $('sheet').classList.add('hidden'); $('sheetPanel').innerHTML = ''; }
+  $('sheet').addEventListener('click', (e) => { if (e.target.id === 'sheet' || e.target.closest('[data-close]')) closeSheet(); });
+
+  // ---------- WALK-IN ----------
+  const total = () => ticket.reduce((s, l) => s + (l.unit == null ? 0 : l.unit * l.qty), 0);
+  function renderWalkin() {
+    const el = $('tab-walkin');
+    if (el.dataset.built && el.contains(document.activeElement) && document.activeElement.tagName === 'INPUT') { renderTicketTotals(); return; }
+    const secs = M.sections || [];
+    let h = '<div class="wk"><div><h2>Walk-in sale</h2>';
+    for (const s of secs) {
+      const items = M.items.filter(i => i.sec === s.id); if (!items.length) continue;
+      h += '<div class="sec-title">' + esc(s.title || s.name || s.id) + '</div><div class="grid">' + items.map(it => {
+        const c = defaultCost(it);
+        return '<button class="item" data-item="' + it.id + '"><img src="../images/' + esc(it.img) + '" alt="" loading="lazy" width="640" height="480"><div class="ib"><b>' + esc(it.name) + '</b><div class="pr">' + (it.price ? money(it.price) : 'Price to confirm') + '</div>' +
+          '<div class="mg">est. cost ' + money(c) + (it.price ? ' · margin ' + pct(it.price - c, it.price) : '') + '</div></div></button>';
+      }).join('') + '</div>';
+    }
+    h += '</div><div class="card ticket" id="ticket"></div></div>';
+    el.innerHTML = h; el.dataset.built = '1'; renderTicket();
+  }
+  function defaultCost(it) { const ch = it.groups.map(() => 0); return lineCost(it.id, summary(it, ch), 1).cost; }
+  function renderTicket() {
+    const t = $('ticket'); if (!t) return;
+    let h = '<h3>🧾 Ticket <span class="tag walk-in">Walk-in · cash</span></h3>';
+    if (!ticket.length) h += '<p class="muted small">Tap menu items to add them.</p>';
+    h += ticket.map((l, i) => { const c = lineCost(l.id, l.choices, l.qty).cost, lt = l.unit == null ? null : l.unit * l.qty;
+      return '<div class="tl"><b>' + l.qty + '×</b><div>' + esc(l.name) + (l.choices ? '<div class="muted small">' + esc(l.choices) + '</div>' : '') +
+        '<div class="small muted">cost ' + money(c) + (lt == null ? '' : ' · profit ' + pm(lt - c)) + (l.manual ? ' · manual price' : '') + '</div></div><div style="text-align:right"><b>' + (lt == null ? '–' : money(lt)) + '</b><br><button class="x" data-rm="' + i + '" title="Remove">✕</button></div></div>'; }).join('');
+    h += '<div id="ttot"></div>';
+    h += '<div class="field"><label>Customer name (optional)</label><input id="cName" maxlength="40" value="' + esc(custName) + '" placeholder="For calling out the order"></div>' +
+      '<div class="field"><label>Note (optional)</label><input id="cNote" maxlength="100" value="' + esc(custNote) + '" placeholder="e.g. extra sauce"></div>' +
+      '<div class="cash"><label class="small"><b>Cash tendered (G$)</b> · cash only, no card</label><input id="tend" type="number" inputmode="numeric" min="0" value="' + esc(tendered) + '" placeholder="Amount received">' +
+      '<div class="quick"><button class="btn" data-q="exact">Exact</button><button class="btn" data-q="1000">1,000</button><button class="btn" data-q="5000">5,000</button><button class="btn" data-q="10000">10,000</button><button class="btn" data-q="20000">20,000</button></div><div id="chg"></div>' +
+      '<button class="btn red big" id="complete">Complete cash sale</button>' + (ticket.length ? '<button class="btn sm" id="clearT" style="margin-top:4px">Clear ticket</button>' : '') + '</div>';
+    t.innerHTML = h; renderTicketTotals();
+  }
+  function renderTicketTotals() {
+    const tt = $('ttot'); if (!tt) return;
+    const tot = total(), cost = ticket.reduce((s, l) => s + lineCost(l.id, l.choices, l.qty).cost, 0);
+    tt.innerHTML = '<div class="tot big" style="margin-top:8px"><span>Total</span><span>' + money(tot) + '</span></div><div class="tot muted"><span>Est. cost (example)</span><span>' + money(cost) + '</span></div><div class="tot"><span>Est. profit</span><span>' + pm(tot - cost) + ' <span class="muted small">' + pct(tot - cost, tot) + '</span></span></div>';
+    const t = +tendered || 0, chg = $('chg');
+    if (chg) chg.innerHTML = !ticket.length ? '' : (t >= tot && t > 0 ? '<div class="change">Change: ' + money(t - tot) + '</div>' : '<div class="change short">' + (t ? 'Short by ' + money(tot - t) : 'Enter cash received') + '</div>');
+    const c = $('complete'); if (c) c.disabled = !ticket.length || t < tot || ticket.some(l => l.unit == null);
+  }
+  $('tab-walkin').addEventListener('input', (e) => { if (e.target.id === 'tend') { tendered = e.target.value; renderTicketTotals(); } if (e.target.id === 'cName') custName = e.target.value; if (e.target.id === 'cNote') custNote = e.target.value; });
+  $('tab-walkin').addEventListener('click', async (e) => {
+    const b = e.target.closest('button'); if (!b) return;
+    if (b.dataset.item) return itemSheet(byId(b.dataset.item));
+    if (b.dataset.rm) { ticket.splice(+b.dataset.rm, 1); return renderTicket(); }
+    if (b.dataset.q) { tendered = String(b.dataset.q === 'exact' ? total() : b.dataset.q); $('tend').value = tendered; return renderTicketTotals(); }
+    if (b.id === 'clearT') { ticket = []; tendered = ''; custName = ''; custNote = ''; return renderTicket(); }
+    if (b.id === 'complete') {
+      b.disabled = true;
+      const j = await act('walkin', { lines: ticket.map(l => ({ id: l.id, qty: l.qty, ch: l.ch, price: l.manual ? l.unit : undefined })), tendered: +tendered, name: custName, note: custNote }, 'Sale saved');
+      if (j && j.order) { toast('✅ ' + j.order.no + ' saved · change ' + money(j.order.cash.change), 6000); ticket = []; tendered = ''; custName = ''; custNote = ''; renderTicket(); }
+      else b.disabled = false;
+    }
+  });
+  function itemSheet(it) {
+    const ch = it.groups.map(() => -1); let qty = 1, price = '';
+    const draw = () => {
+      it.groups.forEach((g, i) => { if (!visible(it, g, ch)) ch[i] = -1; });
+      const sum = summary(it, ch), c = lineCost(it.id, sum, qty).cost, unit = it.price != null ? it.price : (+price || null), lt = unit == null ? null : unit * qty;
+      let h = '<h3>' + esc(it.name) + '</h3><p class="muted small">' + esc(it.desc || '') + '</p>';
+      it.groups.forEach((g, i) => { if (!visible(it, g, ch)) return; h += '<div class="field"><label>' + esc(g.label) + '</label><div class="opts">' + g.opts.map((o, k) => '<button class="opt ' + (ch[i] === k ? 'on' : '') + '" data-g="' + i + '" data-k="' + k + '">' + esc(o) + '</button>').join('') + '</div></div>'; });
+      if (it.price == null) h += '<div class="field"><label>Price per box (G$): price to confirm, enter what you charge</label><input id="mp" type="number" inputmode="numeric" min="1" value="' + esc(price) + '" placeholder="e.g. 3000"></div>';
+      h += '<div class="field"><label>Quantity</label><div class="qty"><button data-qd="-1">−</button><b>' + qty + '</b><button data-qd="1">+</button></div></div>' +
+        '<div class="note small">Line: <b>' + (lt == null ? 'enter price' : money(lt)) + '</b> · est. cost ' + money(c) + (lt == null ? '' : ' · est. profit ' + pm(lt - c)) + ' <span class="tag ex">example costs</span></div>' +
+        '<div class="acts"><button class="btn" data-close>Cancel</button><button class="btn primary" id="addIt">Add to ticket</button></div>';
+      openSheet(h);
+      const mp = $('mp'); if (mp) mp.oninput = () => { price = mp.value; const s = summary(it, ch), u = +price || null; const n = document.querySelector('#sheetPanel .note'); if (n) n.innerHTML = 'Line: <b>' + (u ? money(u * qty) : 'enter price') + '</b> · est. cost ' + money(lineCost(it.id, s, qty).cost) + (u ? ' · est. profit ' + pm(u * qty - lineCost(it.id, s, qty).cost) : '') + ' <span class="tag ex">example costs</span>'; };
+      $('sheetPanel').onclick = (e) => {
+        const b = e.target.closest('button'); if (!b) return;
+        if (b.dataset.g) { ch[+b.dataset.g] = +b.dataset.k; draw(); }
+        else if (b.dataset.qd) { qty = Math.max(1, Math.min(50, qty + +b.dataset.qd)); draw(); }
+        else if (b.id === 'addIt') {
+          const miss = it.groups.find((g, i) => visible(it, g, ch) && ch[i] < 0); if (miss) return toast('Choose: ' + miss.label);
+          if (it.price == null && !(+price > 0)) return toast('Enter the price per box');
+          ticket.push({ id: it.id, name: it.name, ch: ch.slice(), choices: summary(it, ch), qty, unit: it.price != null ? it.price : Math.round(+price), manual: it.price == null });
+          closeSheet(); renderTicket(); toast('Added ' + qty + '× ' + it.name);
+        }
+      };
+    };
+    draw();
+  }
+
+  // ---------- STOCK ----------
+  function renderStock() {
+    const el = $('tab-stock');
+    let h = lowBar() + '<h2>Stock</h2>' + exampleNote() + '<p class="muted small">Every completed order (walk-in, WhatsApp, web) deducts ingredients automatically from the recipes. Going below a minimum shows here and sends ONE WhatsApp alert to the shop\'s own chat' + (D.settings.lowStockWhatsApp ? '' : ' (alerts are switched OFF in Settings)') + '. The POS never orders from or messages vendors.</p><div class="stock">';
+    h += D.ingredients.slice().sort((a, b) => (b.low - a.low) || a.name.localeCompare(b.name)).map(i => {
+      const pctv = Math.max(4, Math.min(100, i.threshold ? i.stock / (i.threshold * 3) * 100 : 100));
+      const v = i.vendor;
+      return '<div class="card si ' + (i.low ? 'low' : '') + '"><div class="sh"><b>' + esc(i.name) + '</b>' + (i.low ? '<span class="tag new">LOW</span>' : '<span class="tag ready">OK</span>') + '</div>' +
+        '<div class="sh"><span class="lvl">' + i.stock + ' <span class="small muted">' + esc(i.unit) + '</span></span><span class="small muted">≈ ' + i.servingsLeft + ' servings</span></div><div class="bar"><i style="width:' + pctv + '%"></i></div>' +
+        '<div class="small muted">Minimum: ' + (i.min.kind === 'servings' ? 'enough for ' + i.min.value + ' servings (' + i.threshold + ' ' + esc(i.unit) + ')' : i.min.value + ' ' + esc(i.unit)) + ' · cost ' + money(i.costPerUnit) + '/' + esc(i.unit) + (i.costExample ? ' <span class="tag ex">example</span>' : '') + '</div>' +
+        '<div class="vend">' + (v ? '🚚 ' + esc(v.name) + (v.placeholder ? ' <span class="tag ph">placeholder</span>' : '') + ' · <a href="tel:' + esc(v.phone.replace(/[^\d+]/g, '')) + '">📞 ' + esc(v.phone) + '</a>' + (i.low ? ' <b class="neg">· call this vendor</b>' : '') : '<span class="muted">No vendor set</span>') + '</div>' +
+        '<div class="acts"><button class="btn sm" data-stk="add" data-id="' + i.id + '">+ Restock</button><button class="btn sm" data-stk="set" data-id="' + i.id + '">Count / set</button></div></div>';
+    }).join('') + '</div>';
+    if (D.alerts.length) h += '<h3>Recent low-stock alerts</h3><table class="t"><tr><th>Time</th><th>Item</th><th>WhatsApp (own chat)</th></tr>' + D.alerts.map(a => '<tr><td>' + time(a.at) + '</td><td>' + esc(a.name || a.id) + ' (' + esc(a.stock) + ')</td><td>' + esc(a.whatsapp || '') + '</td></tr>').join('') + '</table>';
+    el.innerHTML = h;
+  }
+  $('tab-stock').addEventListener('click', (e) => {
+    const b = e.target.closest('button[data-stk]'); if (!b) return;
+    const i = D.ingredients.find(x => x.id === b.dataset.id), add = b.dataset.stk === 'add';
+    openSheet('<h3>' + (add ? 'Restock ' : 'Count ') + esc(i.name) + '</h3><p class="muted small">Now: ' + i.stock + ' ' + esc(i.unit) + '</p><div class="field"><label>' + (add ? 'Quantity received' : 'Counted quantity on hand') + ' (' + esc(i.unit) + ')</label><input id="sq" type="number" inputmode="decimal" step="0.01" min="0"></div><div class="acts"><button class="btn" data-close>Cancel</button><button class="btn primary" id="sqOk">Save</button></div>');
+    $('sq').focus(); $('sqOk').onclick = async () => { const q = $('sq').value; if (q === '') return toast('Enter a quantity'); await act('stock', { id: i.id, op: add ? 'add' : 'set', qty: +q }, i.name + ' updated'); closeSheet(); };
+  });
+
+  // ---------- TODAY ----------
+  function renderToday() {
+    const s = D.summary;
+    let h = '<h2>Today · ' + esc(s.day) + '</h2>' + exampleNote() + '<div class="kpis"><div class="kpi"><b>' + money(s.sales) + '</b><span>Sales (' + s.orders + ' orders)</span></div><div class="kpi"><b>' + money(s.cost) + '</b><span>Est. cost (example)</span></div><div class="kpi"><b>' + pm(s.profit) + '</b><span>Est. profit · ' + pct(s.profit, s.sales) + '</span></div><div class="kpi"><b>' + (s.orders ? money(s.sales / s.orders) : '–') + '</b><span>Average order</span></div></div>';
+    if (s.tbc) h += '<div class="note">' + s.tbc + ' order(s) have a Hot Box / Wrap Box with price still to confirm (not counted in sales). Set the price on the order card.</div>';
+    h += '<h3>By source</h3><div class="scroll"><table class="t"><tr><th>Source</th><th class="r">Orders</th><th class="r">Sales</th><th class="r">Cost</th><th class="r">Profit</th></tr>' +
+      ['walk-in', 'whatsapp', 'web'].map(k => { const b = s.bySource[k] || { orders: 0, sales: 0, cost: 0, profit: 0 }; return '<tr><td><span class="tag ' + k + '">' + SRC[k] + '</span></td><td class="r">' + b.orders + '</td><td class="r">' + money(b.sales) + '</td><td class="r">' + money(b.cost) + '</td><td class="r">' + pm(b.profit) + '</td></tr>'; }).join('') +
+      '<tr><td><b>Total</b></td><td class="r"><b>' + s.orders + '</b></td><td class="r"><b>' + money(s.sales) + '</b></td><td class="r"><b>' + money(s.cost) + '</b></td><td class="r"><b>' + pm(s.profit) + '</b></td></tr></table></div>';
+    const items = Object.entries(s.items).sort((a, b) => b[1].qty - a[1].qty);
+    h += '<h3>Items sold</h3>' + (items.length ? '<div class="scroll"><table class="t"><tr><th>Item</th><th class="r">Qty</th><th class="r">Sales</th><th class="r">Cost</th></tr>' + items.map(([n, v]) => '<tr><td>' + esc(n) + '</td><td class="r">' + v.qty + '</td><td class="r">' + money(v.sales) + '</td><td class="r">' + money(v.cost) + '</td></tr>').join('') + '</table></div>' : '<div class="empty card">No sales yet today.</div>');
+    $('tab-today').innerHTML = h;
+  }
+
+  // ---------- SETTINGS ----------
+  let SD = null;   // editable copy
+  function renderSettings() {
+    SD = { vendors: JSON.parse(JSON.stringify(D.vendors)), ingredients: D.ingredients.map(i => ({ id: i.id, name: i.name, unit: i.unit, costPerUnit: i.costPerUnit, costExample: i.costExample, vendorId: i.vendorId, min: { ...i.min } })), recipes: JSON.parse(JSON.stringify(D.recipes)), settings: { readyText: D.settings.readyText, readyTextDelivery: D.settings.readyTextDelivery, lowStockWhatsApp: D.settings.lowStockWhatsApp } };
+    drawSettings();
+  }
+  function drawSettings() {
+    const ingOpts = (sel) => SD.ingredients.map(i => '<option value="' + i.id + '"' + (i.id === sel ? ' selected' : '') + '>' + esc(i.name) + '</option>').join('');
+    let h = '<h2>Settings</h2><div class="note">🧪 <b>' + esc(D.settings.examplesNote || 'Example numbers, Calton to supply.') + '</b> Everything marked <span class="tag ex">example</span> or <span class="tag ph">placeholder</span> is invented for the demo: replace it with real costs, portions and vendor details, then untick "example".</div>';
+    h += '<h3>Ready messages</h3><div class="card">' + (D.settings.readyTestMode ? '<div class="note blue">🧪 <b>TEST MODE is ON</b> (set on the shop PC, not here). Ready messages go to the own test chat ' + esc(D.settings.ownChat) + ', labelled TEST. Going live needs Calton\'s OK. When live, customers get the WhatsApp line\'s fixed safe wording (same as the default below), only on confirmed numbers.</div>' : '<div class="note red"><b>LIVE:</b> ready messages go to customers with a confirmed WhatsApp number.</div>') +
+      '<div class="field"><label>Pickup message ({name} {no} {total})</label><textarea data-s="readyText" rows="3">' + esc(SD.settings.readyText) + '</textarea></div>' +
+      '<div class="field"><label>Delivery message</label><textarea data-s="readyTextDelivery" rows="3">' + esc(SD.settings.readyTextDelivery) + '</textarea></div>' +
+      '<label class="small"><input type="checkbox" data-s="lowStockWhatsApp"' + (SD.settings.lowStockWhatsApp ? ' checked' : '') + '> Send low-stock WhatsApp alerts to the shop\'s own chat</label></div>';
+    h += '<h3>Ingredients &amp; costs</h3><div class="scroll"><table class="t"><tr><th>Name</th><th>Unit</th><th>Cost / unit (G$)</th><th>Example?</th><th>Low-stock minimum</th><th>Vendor</th></tr>' + SD.ingredients.map((i, k) =>
+      '<tr><td><input data-i="' + k + '" data-f="name" value="' + esc(i.name) + '"></td><td><input data-i="' + k + '" data-f="unit" value="' + esc(i.unit) + '" style="min-width:55px"></td><td><input type="number" step="0.01" data-i="' + k + '" data-f="costPerUnit" value="' + i.costPerUnit + '"></td>' +
+      '<td><input type="checkbox" data-i="' + k + '" data-f="costExample"' + (i.costExample ? ' checked' : '') + '></td>' +
+      '<td style="white-space:nowrap"><select data-i="' + k + '" data-f="minKind" style="width:auto"><option value="qty"' + (i.min.kind === 'qty' ? ' selected' : '') + '>quantity</option><option value="servings"' + (i.min.kind === 'servings' ? ' selected' : '') + '>servings</option></select> <input type="number" step="0.01" data-i="' + k + '" data-f="minValue" value="' + i.min.value + '" style="width:80px;min-width:60px"></td>' +
+      '<td><select data-i="' + k + '" data-f="vendorId"><option value="">–</option>' + SD.vendors.map(v => '<option value="' + esc(v.id) + '"' + (v.id === i.vendorId ? ' selected' : '') + '>' + esc(v.name) + '</option>').join('') + '</select></td></tr>').join('') + '</table></div>';
+    h += '<h3>Vendors</h3><p class="muted small">Names/phones are only shown to staff and in the low-stock alert. The POS never contacts vendors.</p><div class="scroll"><table class="t"><tr><th>Name</th><th>Phone</th><th>Placeholder?</th></tr>' + SD.vendors.map((v, k) =>
+      '<tr><td><input data-v="' + k + '" data-f="name" value="' + esc(v.name) + '"></td><td><input data-v="' + k + '" data-f="phone" value="' + esc(v.phone) + '"></td><td><input type="checkbox" data-v="' + k + '" data-f="placeholder"' + (v.placeholder ? ' checked' : '') + '></td></tr>').join('') + '</table></div><button class="btn sm" id="addV" style="margin-top:6px">+ Add vendor</button>';
+    h += '<h3>Recipes (per serving)</h3><p class="muted small">"Only if choice contains" applies a line when the order\'s choices mention that word (e.g. Wings / Strip chicken / Fries), once per mention.</p>';
+    for (const it of M.items) {
+      const rec = SD.recipes[it.id] || (SD.recipes[it.id] = { example: true, rules: [] });
+      const c = lineCost2(it, rec);
+      h += '<details class="rec"><summary>' + esc(it.name) + ' · est. cost ' + money(c) + (it.price ? ' · price ' + money(it.price) + ' · margin ' + pct(it.price - c, it.price) : ' · price to confirm') + (rec.example ? ' <span class="tag ex">example</span>' : '') + '</summary><div class="rb"><div class="scroll"><table class="t"><tr><th>Ingredient</th><th>Qty / serving</th><th>Only if choice contains</th><th></th></tr>' +
+        rec.rules.map((r, k) => '<tr><td><select data-r="' + it.id + '" data-k="' + k + '" data-f="ing">' + ingOpts(r.ing) + '</select></td><td><input type="number" step="0.001" data-r="' + it.id + '" data-k="' + k + '" data-f="qty" value="' + r.qty + '"></td><td><input data-r="' + it.id + '" data-k="' + k + '" data-f="match" value="' + esc(r.match || '') + '" placeholder="(always)"></td><td><button class="btn sm" data-rr="' + it.id + '" data-k="' + k + '">✕</button></td></tr>').join('') +
+        '</table></div><div class="acts"><button class="btn sm" data-ra="' + it.id + '">+ Ingredient</button><label class="small"><input type="checkbox" data-re="' + it.id + '"' + (rec.example ? ' checked' : '') + '> example (Calton to supply)</label></div></div></details>';
+    }
+    h += '<div class="acts savebar"><button class="btn" id="resetS">Discard changes</button><button class="btn red" id="saveS">Save settings</button></div>' +
+      '<h3>This device</h3><div class="card small">Signed in as staff. <button class="btn sm" id="signOut">Sign out</button></div>';
+    const open = [...document.querySelectorAll('#tab-settings details[open] summary')].map(s => s.textContent.split(' · ')[0]);
+    $('tab-settings').innerHTML = h;
+    document.querySelectorAll('#tab-settings details').forEach(d => { if (open.includes(d.querySelector('summary').textContent.split(' · ')[0])) d.open = true; });
+  }
+  function lineCost2(it, rec) { const ing = {}; SD.ingredients.forEach(i => { ing[i.id] = i; }); const ch = summary(it, it.groups.map(() => 0)); let c = 0; for (const r of rec.rules) if (ing[r.ing]) c += (+r.qty || 0) * count(ch, r.match) * (+ing[r.ing].costPerUnit || 0); return Math.round(c); }
+  $('tab-settings').addEventListener('input', (e) => {
+    const t = e.target, d = t.dataset; dirtySettings = true;
+    const val = t.type === 'checkbox' ? t.checked : t.value;
+    if (d.s) SD.settings[d.s] = val;
+    else if (d.i) { const i = SD.ingredients[+d.i]; if (d.f === 'minKind') i.min.kind = val; else if (d.f === 'minValue') i.min.value = +val; else if (d.f === 'costPerUnit') i.costPerUnit = +val; else i[d.f] = val; }
+    else if (d.v) SD.vendors[+d.v][d.f] = val;
+    else if (d.r) { const r = SD.recipes[d.r].rules[+d.k]; r[d.f] = d.f === 'qty' ? +val : val; if (d.f === 'match' && !val) delete r.match; }
+    else if (d.re) SD.recipes[d.re].example = val;
+  });
+  $('tab-settings').addEventListener('change', (e) => { if (e.target.dataset.r || e.target.dataset.f === 'costPerUnit') drawSettings(); });
+  $('tab-settings').addEventListener('click', async (e) => {
+    const b = e.target.closest('button'); if (!b) return;
+    if (b.id === 'addV') { dirtySettings = true; SD.vendors.push({ id: 'v-' + Date.now().toString(36), name: 'New vendor', phone: '', placeholder: true }); return drawSettings(); }
+    if (b.dataset.ra) { dirtySettings = true; SD.recipes[b.dataset.ra].rules.push({ ing: SD.ingredients[0].id, qty: 0.1 }); return drawSettings(); }
+    if (b.dataset.rr) { dirtySettings = true; SD.recipes[b.dataset.rr].rules.splice(+b.dataset.k, 1); return drawSettings(); }
+    if (b.id === 'resetS') { dirtySettings = false; return renderSettings(); }
+    if (b.id === 'signOut') { localStorage.removeItem(TOKEN_KEY); return location.reload(); }
+    if (b.id === 'saveS') { b.disabled = true; const j = await act('settings', SD, 'Settings saved'); b.disabled = false; if (j) { dirtySettings = false; renderSettings(); } }
+  });
+
+  // ---------- boot ----------
+  if (!RAW || !CFG.ASSISTANT_API) { document.body.innerHTML = '<p style="padding:20px">POS not configured.</p>'; return; }
+  if (localStorage.getItem(TOKEN_KEY)) startPoll(); else showLogin();
+  document.addEventListener('visibilitychange', () => { if (!document.hidden && localStorage.getItem(TOKEN_KEY)) sync(); });
+})();

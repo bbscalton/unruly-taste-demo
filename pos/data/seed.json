@@ -1,0 +1,733 @@
+{
+ "_about": "Unruly Taste POS demo seed. EXAMPLE costs, recipes, portions and vendor placeholders (Calton to supply real values). No customer data. Live data lives on PC01 (unruly-taste-bot\\data\\pos.json), never in this repo.",
+ "version": 1,
+ "settings": {
+  "currency": "G$",
+  "readyTestMode": true,
+  "ownChat": "5927129487",
+  "lowStockWhatsApp": true,
+  "examplesNote": "Example costs, recipes and portions — Calton to supply real numbers.",
+  "readyText": "✅ Hi {name}, your Unruly Taste order {no} is ready for pickup at 5th Street, Alberttown (between Light & Albert St). Total {total}, pay on pickup. Thank you!",
+  "readyTextDelivery": "✅ Hi {name}, your Unruly Taste order {no} is ready and will be on its way shortly. Total {total} + delivery, pay on delivery. Thank you!"
+ },
+ "vendors": [
+  {
+   "id": "v-chicken",
+   "name": "Chicken supplier (placeholder)",
+   "phone": "+592 000 0001 (placeholder)",
+   "placeholder": true
+  },
+  {
+   "id": "v-produce",
+   "name": "Produce vendor (placeholder)",
+   "phone": "+592 000 0002 (placeholder)",
+   "placeholder": true
+  },
+  {
+   "id": "v-grocery",
+   "name": "Grocery wholesaler (placeholder)",
+   "phone": "+592 000 0003 (placeholder)",
+   "placeholder": true
+  },
+  {
+   "id": "v-bakery",
+   "name": "Bakery (placeholder)",
+   "phone": "+592 000 0004 (placeholder)",
+   "placeholder": true
+  },
+  {
+   "id": "v-packaging",
+   "name": "Packaging supplier (placeholder)",
+   "phone": "+592 000 0005 (placeholder)",
+   "placeholder": true
+  }
+ ],
+ "ingredients": [
+  {
+   "id": "wings",
+   "name": "Chicken wings",
+   "unit": "kg",
+   "costPerUnit": 1600,
+   "costExample": true,
+   "vendorId": "v-chicken",
+   "stock": 20,
+   "min": {
+    "kind": "servings",
+    "value": 8
+   }
+  },
+  {
+   "id": "strips",
+   "name": "Chicken strips (boneless)",
+   "unit": "kg",
+   "costPerUnit": 2200,
+   "costExample": true,
+   "vendorId": "v-chicken",
+   "stock": 8,
+   "min": {
+    "kind": "servings",
+    "value": 10
+   }
+  },
+  {
+   "id": "patty",
+   "name": "Chicken burger patty",
+   "unit": "each",
+   "costPerUnit": 300,
+   "costExample": true,
+   "vendorId": "v-chicken",
+   "stock": 40,
+   "min": {
+    "kind": "qty",
+    "value": 10
+   }
+  },
+  {
+   "id": "breading",
+   "name": "Flour / breading mix",
+   "unit": "kg",
+   "costPerUnit": 400,
+   "costExample": true,
+   "vendorId": "v-grocery",
+   "stock": 10,
+   "min": {
+    "kind": "qty",
+    "value": 2
+   }
+  },
+  {
+   "id": "oil",
+   "name": "Cooking oil",
+   "unit": "L",
+   "costPerUnit": 800,
+   "costExample": true,
+   "vendorId": "v-grocery",
+   "stock": 20,
+   "min": {
+    "kind": "qty",
+    "value": 5
+   }
+  },
+  {
+   "id": "potato",
+   "name": "Potatoes (fries)",
+   "unit": "kg",
+   "costPerUnit": 300,
+   "costExample": true,
+   "vendorId": "v-produce",
+   "stock": 25,
+   "min": {
+    "kind": "servings",
+    "value": 15
+   }
+  },
+  {
+   "id": "macaroni",
+   "name": "Macaroni",
+   "unit": "kg",
+   "costPerUnit": 800,
+   "costExample": true,
+   "vendorId": "v-grocery",
+   "stock": 8,
+   "min": {
+    "kind": "qty",
+    "value": 2
+   }
+  },
+  {
+   "id": "cheese",
+   "name": "Cheese",
+   "unit": "kg",
+   "costPerUnit": 2800,
+   "costExample": true,
+   "vendorId": "v-grocery",
+   "stock": 5,
+   "min": {
+    "kind": "qty",
+    "value": 1
+   }
+  },
+  {
+   "id": "waffle",
+   "name": "Waffle mix",
+   "unit": "kg",
+   "costPerUnit": 1000,
+   "costExample": true,
+   "vendorId": "v-grocery",
+   "stock": 4,
+   "min": {
+    "kind": "qty",
+    "value": 1
+   }
+  },
+  {
+   "id": "plantain",
+   "name": "Plantain",
+   "unit": "each",
+   "costPerUnit": 150,
+   "costExample": true,
+   "vendorId": "v-produce",
+   "stock": 30,
+   "min": {
+    "kind": "qty",
+    "value": 8
+   }
+  },
+  {
+   "id": "bun",
+   "name": "Burger bun",
+   "unit": "each",
+   "costPerUnit": 120,
+   "costExample": true,
+   "vendorId": "v-bakery",
+   "stock": 40,
+   "min": {
+    "kind": "qty",
+    "value": 10
+   }
+  },
+  {
+   "id": "tortilla",
+   "name": "Tortilla wrap",
+   "unit": "each",
+   "costPerUnit": 150,
+   "costExample": true,
+   "vendorId": "v-bakery",
+   "stock": 40,
+   "min": {
+    "kind": "qty",
+    "value": 10
+   }
+  },
+  {
+   "id": "sauce",
+   "name": "Wing sauce (all flavours)",
+   "unit": "L",
+   "costPerUnit": 2000,
+   "costExample": true,
+   "vendorId": "v-grocery",
+   "stock": 6,
+   "min": {
+    "kind": "qty",
+    "value": 1
+   }
+  },
+  {
+   "id": "dip",
+   "name": "Dipping sauce",
+   "unit": "L",
+   "costPerUnit": 2000,
+   "costExample": true,
+   "vendorId": "v-grocery",
+   "stock": 3,
+   "min": {
+    "kind": "qty",
+    "value": 0.5
+   }
+  },
+  {
+   "id": "refresher",
+   "name": "Refresher drink",
+   "unit": "each",
+   "costPerUnit": 250,
+   "costExample": true,
+   "vendorId": "v-grocery",
+   "stock": 48,
+   "min": {
+    "kind": "qty",
+    "value": 12
+   }
+  },
+  {
+   "id": "boxS",
+   "name": "Takeout box (small)",
+   "unit": "each",
+   "costPerUnit": 100,
+   "costExample": true,
+   "vendorId": "v-packaging",
+   "stock": 150,
+   "min": {
+    "kind": "qty",
+    "value": 30
+   }
+  },
+  {
+   "id": "boxL",
+   "name": "Takeout box (large)",
+   "unit": "each",
+   "costPerUnit": 150,
+   "costExample": true,
+   "vendorId": "v-packaging",
+   "stock": 100,
+   "min": {
+    "kind": "qty",
+    "value": 25
+   }
+  }
+ ],
+ "recipes": {
+  "wt": {
+   "example": true,
+   "rules": [
+    {
+     "ing": "wings",
+     "qty": 0.55
+    },
+    {
+     "ing": "breading",
+     "qty": 0.08
+    },
+    {
+     "ing": "oil",
+     "qty": 0.096
+    },
+    {
+     "ing": "sauce",
+     "qty": 0.05
+    },
+    {
+     "ing": "boxS",
+     "qty": 1
+    }
+   ]
+  },
+  "ws": {
+   "example": true,
+   "rules": [
+    {
+     "ing": "wings",
+     "qty": 0.55
+    },
+    {
+     "ing": "breading",
+     "qty": 0.08
+    },
+    {
+     "ing": "oil",
+     "qty": 0.096
+    },
+    {
+     "ing": "sauce",
+     "qty": 0.05
+    },
+    {
+     "ing": "potato",
+     "qty": 0.25,
+     "match": "Fries"
+    },
+    {
+     "ing": "oil",
+     "qty": 0.04,
+     "match": "Fries"
+    },
+    {
+     "ing": "macaroni",
+     "qty": 0.1,
+     "match": "Mac & Cheese"
+    },
+    {
+     "ing": "cheese",
+     "qty": 0.04,
+     "match": "Mac & Cheese"
+    },
+    {
+     "ing": "waffle",
+     "qty": 0.12,
+     "match": "Waffles"
+    },
+    {
+     "ing": "plantain",
+     "qty": 1,
+     "match": "Plantain"
+    },
+    {
+     "ing": "boxL",
+     "qty": 1
+    }
+   ]
+  },
+  "wc": {
+   "example": true,
+   "rules": [
+    {
+     "ing": "wings",
+     "qty": 0.55
+    },
+    {
+     "ing": "breading",
+     "qty": 0.08
+    },
+    {
+     "ing": "oil",
+     "qty": 0.096
+    },
+    {
+     "ing": "sauce",
+     "qty": 0.05
+    },
+    {
+     "ing": "potato",
+     "qty": 0.25
+    },
+    {
+     "ing": "oil",
+     "qty": 0.04
+    },
+    {
+     "ing": "macaroni",
+     "qty": 0.1
+    },
+    {
+     "ing": "cheese",
+     "qty": 0.04
+    },
+    {
+     "ing": "boxL",
+     "qty": 1
+    }
+   ]
+  },
+  "bw": {
+   "example": true,
+   "rules": [
+    {
+     "ing": "wings",
+     "qty": 0.3
+    },
+    {
+     "ing": "breading",
+     "qty": 0.04
+    },
+    {
+     "ing": "oil",
+     "qty": 0.048
+    },
+    {
+     "ing": "sauce",
+     "qty": 0.03
+    },
+    {
+     "ing": "bun",
+     "qty": 1
+    },
+    {
+     "ing": "patty",
+     "qty": 1
+    },
+    {
+     "ing": "potato",
+     "qty": 0.25
+    },
+    {
+     "ing": "oil",
+     "qty": 0.04
+    },
+    {
+     "ing": "dip",
+     "qty": 0.04
+    },
+    {
+     "ing": "boxL",
+     "qty": 1
+    }
+   ]
+  },
+  "hb": {
+   "example": true,
+   "rules": [
+    {
+     "ing": "bun",
+     "qty": 1
+    },
+    {
+     "ing": "patty",
+     "qty": 1
+    },
+    {
+     "ing": "potato",
+     "qty": 0.25
+    },
+    {
+     "ing": "oil",
+     "qty": 0.04
+    },
+    {
+     "ing": "macaroni",
+     "qty": 0.1
+    },
+    {
+     "ing": "cheese",
+     "qty": 0.04
+    },
+    {
+     "ing": "wings",
+     "qty": 0.3,
+     "match": "Wings"
+    },
+    {
+     "ing": "breading",
+     "qty": 0.04,
+     "match": "Wings"
+    },
+    {
+     "ing": "oil",
+     "qty": 0.048,
+     "match": "Wings"
+    },
+    {
+     "ing": "sauce",
+     "qty": 0.03,
+     "match": "Wings"
+    },
+    {
+     "ing": "strips",
+     "qty": 0.2,
+     "match": "Strip chicken"
+    },
+    {
+     "ing": "breading",
+     "qty": 0.04,
+     "match": "Strip chicken"
+    },
+    {
+     "ing": "oil",
+     "qty": 0.048,
+     "match": "Strip chicken"
+    },
+    {
+     "ing": "boxL",
+     "qty": 1
+    }
+   ]
+  },
+  "wb": {
+   "example": true,
+   "rules": [
+    {
+     "ing": "tortilla",
+     "qty": 1
+    },
+    {
+     "ing": "strips",
+     "qty": 0.1
+    },
+    {
+     "ing": "potato",
+     "qty": 0.25
+    },
+    {
+     "ing": "oil",
+     "qty": 0.04
+    },
+    {
+     "ing": "macaroni",
+     "qty": 0.1
+    },
+    {
+     "ing": "cheese",
+     "qty": 0.04
+    },
+    {
+     "ing": "wings",
+     "qty": 0.3,
+     "match": "Wings"
+    },
+    {
+     "ing": "breading",
+     "qty": 0.04,
+     "match": "Wings"
+    },
+    {
+     "ing": "oil",
+     "qty": 0.048,
+     "match": "Wings"
+    },
+    {
+     "ing": "sauce",
+     "qty": 0.03,
+     "match": "Wings"
+    },
+    {
+     "ing": "strips",
+     "qty": 0.2,
+     "match": "Strip chicken"
+    },
+    {
+     "ing": "breading",
+     "qty": 0.04,
+     "match": "Strip chicken"
+    },
+    {
+     "ing": "oil",
+     "qty": 0.048,
+     "match": "Strip chicken"
+    },
+    {
+     "ing": "boxL",
+     "qty": 1
+    }
+   ]
+  },
+  "db": {
+   "example": true,
+   "rules": [
+    {
+     "ing": "bun",
+     "qty": 1,
+     "match": "Hot Box"
+    },
+    {
+     "ing": "patty",
+     "qty": 1,
+     "match": "Hot Box"
+    },
+    {
+     "ing": "tortilla",
+     "qty": 1,
+     "match": "Wrap Box"
+    },
+    {
+     "ing": "strips",
+     "qty": 0.1,
+     "match": "Wrap Box"
+    },
+    {
+     "ing": "potato",
+     "qty": 0.5
+    },
+    {
+     "ing": "oil",
+     "qty": 0.08
+    },
+    {
+     "ing": "macaroni",
+     "qty": 0.2
+    },
+    {
+     "ing": "cheese",
+     "qty": 0.08
+    },
+    {
+     "ing": "wings",
+     "qty": 0.3,
+     "match": "Wings"
+    },
+    {
+     "ing": "breading",
+     "qty": 0.04,
+     "match": "Wings"
+    },
+    {
+     "ing": "oil",
+     "qty": 0.048,
+     "match": "Wings"
+    },
+    {
+     "ing": "sauce",
+     "qty": 0.03,
+     "match": "Wings"
+    },
+    {
+     "ing": "strips",
+     "qty": 0.2,
+     "match": "Strip chicken"
+    },
+    {
+     "ing": "breading",
+     "qty": 0.04,
+     "match": "Strip chicken"
+    },
+    {
+     "ing": "oil",
+     "qty": 0.048,
+     "match": "Strip chicken"
+    },
+    {
+     "ing": "boxL",
+     "qty": 2
+    }
+   ]
+  },
+  "mm": {
+   "example": true,
+   "rules": [
+    {
+     "ing": "bun",
+     "qty": 1
+    },
+    {
+     "ing": "patty",
+     "qty": 1
+    },
+    {
+     "ing": "tortilla",
+     "qty": 1
+    },
+    {
+     "ing": "strips",
+     "qty": 0.1
+    },
+    {
+     "ing": "potato",
+     "qty": 0.5
+    },
+    {
+     "ing": "oil",
+     "qty": 0.08
+    },
+    {
+     "ing": "macaroni",
+     "qty": 0.2
+    },
+    {
+     "ing": "cheese",
+     "qty": 0.08
+    },
+    {
+     "ing": "wings",
+     "qty": 0.3,
+     "match": "Wings"
+    },
+    {
+     "ing": "breading",
+     "qty": 0.04,
+     "match": "Wings"
+    },
+    {
+     "ing": "oil",
+     "qty": 0.048,
+     "match": "Wings"
+    },
+    {
+     "ing": "sauce",
+     "qty": 0.03,
+     "match": "Wings"
+    },
+    {
+     "ing": "strips",
+     "qty": 0.2,
+     "match": "Strip chicken"
+    },
+    {
+     "ing": "breading",
+     "qty": 0.04,
+     "match": "Strip chicken"
+    },
+    {
+     "ing": "oil",
+     "qty": 0.048,
+     "match": "Strip chicken"
+    },
+    {
+     "ing": "refresher",
+     "qty": 2
+    },
+    {
+     "ing": "boxL",
+     "qty": 2
+    }
+   ]
+  }
+ },
+ "recipeNote": "Rule qty is per 1 item. A rule with 'match' counts how many times that text appears in the chosen options (e.g. 'Wings' twice in a Double Bubble = 2 portions)."
+}
