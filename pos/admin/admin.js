@@ -191,7 +191,7 @@
     try { const j = await api('status', { admin: { op: 'audit' } }); rowsA = j.audit || []; }
     catch (e) { $('view').innerHTML = '<div class="note">' + esc(e.message) + '</div>'; return; }
     $('view').innerHTML = '<h2>Activity</h2><p class="muted small">Read-only. Owner only. Who changed what, and when (Guyana time is the shop clock).</p><div class="card small">' +
-      (rowsA.map((a) => '<div style="padding:6px 0;border-bottom:1px solid #eee"><b>' + esc(a.action) + '</b> · ' + esc(a.user || '') + ' · ' + esc((a.at || '').replace('T', ' ').slice(0, 19)) +
+      (rowsA.map((a) => '<div style="padding:6px 0;border-bottom:1px solid #eee"><b>' + esc(a.action) + '</b> · ' + esc(a.user || '') + ' · ' + esc(a.at ? new Date(a.at).toLocaleString('en-US', { timeZone: 'America/Guyana', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : '') +
         '<div class="muted">' + esc(JSON.stringify(a.before || null)).slice(0, 180) + ' → ' + esc(JSON.stringify(a.after || null)).slice(0, 180) + '</div></div>').join('') || '<span class="muted">No changes yet.</span>') + '</div>';
   }
 
