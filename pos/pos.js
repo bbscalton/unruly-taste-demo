@@ -87,6 +87,22 @@
     } catch (err) { $('loginErr').textContent = err.message; localStorage.removeItem(TOKEN_KEY); }
   });
 
+  const so = $('signOutBtn'); if (so) so.addEventListener('click', () => { localStorage.removeItem(TOKEN_KEY); location.reload(); });
+  const abtn = $('adminBtn'); if (abtn) abtn.addEventListener('click', () => {
+    openSheet('<h3>Open Admin</h3><p>Enter an <b>owner or manager</b> PIN. This is checked on the shop PC. A staff PIN does not open Admin, even if this till is already signed in.</p><div class="field"><label>PIN</label><input id="adminPin" type="password" autocomplete="current-password"></div><p class="err" id="adminPinErr"></p><div class="acts"><button class="btn" data-close type="button">Cancel</button><button class="btn primary" id="adminGo" type="button">Continue</button></div>');
+    setTimeout(() => { const i = $('adminPin'); if (i) i.focus(); }, 50);
+    $('adminGo').onclick = async () => {
+      $('adminGo').disabled = true; $('adminPinErr').textContent = '';
+      try {
+        const r = await fetch(API + 'auth', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pin: $('adminPin').value.trim(), admin: true }) });
+        let j = {}; try { j = await r.json(); } catch {}
+        if (!r.ok || !j.session) { $('adminPinErr').textContent = j.error || 'That PIN cannot open Admin.'; $('adminGo').disabled = false; return; }
+        sessionStorage.setItem('ut_admin_session', j.session);
+        location.href = 'admin/';
+      } catch (e) { $('adminPinErr').textContent = e.message; $('adminGo').disabled = false; }
+    };
+  });
+
   // ---------- tabs ----------
   $('tabs').addEventListener('click', (e) => { const b = e.target.closest('button[data-tab]'); if (b) setTab(b.dataset.tab); });
   $('bell').addEventListener('click', () => setTab('stock'));
@@ -103,18 +119,23 @@
     $('lowCount').textContent = low; $('lowCount').classList.toggle('hidden', !low);
     $('bellCount').textContent = low; $('bellCount').classList.toggle('hidden', !low);
     const pq = D.printQueued || 0; $('pqCount').textContent = pq; $('pqCount').classList.toggle('hidden', !pq);
-    const pr = (D.promo && D.promo.promos || []).filter(p => p.status === 'running' || p.status === 'scheduled').length; if ($('promoCount')) { $('promoCount').textContent = pr; $('promoCount').classList.toggle('hidden', !pr); }
-    const role = D.me && D.me.role;
-    const ab = $('tabAdminBtn'); if (ab) ab.classList.toggle('hidden', role !== 'owner' && role !== 'manager');
+    applyCatalog();
+    const showAdmin = !(D.settings && D.settings.pos && D.settings.pos.showAdminButton === false);
+    const ab = $('adminBtn'); if (ab) ab.classList.toggle('hidden', !showAdmin);
     processPrintQueue();
-    if (!window._utAdminOnce && (location.hash === '#admin' || /[?&]admin=1/.test(location.search)) && (role === 'owner' || role === 'manager')) { window._utAdminOnce = 1; return setTab('admin'); }
     if (tab === 'orders') renderOrders();
     else if (tab === 'walkin') renderWalkin();
     else if (tab === 'stock') renderStock();
     else if (tab === 'today') renderToday();
-    else if (tab === 'promo') renderPromo();
-    else if (tab === 'admin') renderAdmin();
-    else if (tab === 'settings' && (forceSettings || !dirtySettings)) renderSettings();
+  }
+  function applyCatalog() {
+    for (const c of (D && D.catalog) || []) {
+      const it = M.items.find(i => i.id === c.id); if (!it) continue;
+      if (c.name) it.name = c.name;
+      if (c.price === null || typeof c.price === 'number') it.price = c.price;
+      it.available = c.available !== false;
+      if (c.category) it.sec = c.category;
+    }
   }
   const exampleNote = () => { const n = { example: 0, estimate: 0, real: 0 }; D.ingredients.forEach(i => n[labelOf(i)]++);
     return '<div class="note">🧪 <b>Costs are not the restaurant\'s real numbers yet.</b> ' + n.estimate + ' ingredients use a <span class="tag est">market estimate</span> (public Guyana shop price; source + date on the Stock tab), ' + n.example + ' are <span class="tag ex">example</span> (made up), ' + n.real + ' are <span class="tag real">real (owner)</span>. Portions are typical fast-food estimates and vendors are placeholders until the owner fills in the ingredient sheet. Profit shown is an estimate.</div>'; };
@@ -205,7 +226,7 @@
     const secs = M.sections || [];
     let h = '<div class="wk"><div><h2>Walk-in sale</h2>';
     for (const s of secs) {
-      const items = M.items.filter(i => i.sec === s.id); if (!items.length) continue;
+      const items = M.items.filter(i => i.sec === s.id && i.available !== false); if (!items.length) continue;
       h += '<div class="sec-title">' + esc(s.title || s.name || s.id) + '</div><div class="grid">' + items.map(it => {
         const c = defaultCost(it);
         return '<button class="item" data-item="' + it.id + '">' + thumb(it) + '<div class="ib"><b>' + esc(it.name) + '</b>' + (it.day != null ? ' <span class="tag ' + (dayWarn(it) ? 'ph' : 'ready') + '">' + esc(it.dayName) + 's</span>' : '') + '<div class="pr">' + (it.price ? money(it.price) : 'Price to confirm') + '</div>' +
@@ -379,7 +400,7 @@
     document.querySelectorAll('#tab-settings details').forEach(d => { if (open.includes(d.querySelector('summary').textContent.split(' · ')[0])) d.open = true; });
   }
   function lineCost2(it, rec) { const ing = {}; SD.ingredients.forEach(i => { ing[i.id] = i; }); const ch = summary(it, it.groups.map(() => 0)); let c = 0; for (const r of rec.rules) if (ing[r.ing]) c += (+r.qty || 0) * count(ch, r.match) * (+ing[r.ing].costPerUnit || 0); return Math.round(c); }
-  $('tab-settings').addEventListener('input', (e) => {
+  if ($('tab-settings')) $('tab-settings').addEventListener('input', (e) => {
     const t = e.target, d = t.dataset; dirtySettings = true;
     const val = t.type === 'checkbox' ? t.checked : t.value;
     if (t.id === 'printStation') { localStorage.setItem(PS_KEY, t.checked ? '1' : '0'); dirtySettings = false; return toast(t.checked ? 'This device is the print station' : 'Print station off on this device'); }
@@ -393,8 +414,8 @@
     else if (d.r) { const r = SD.recipes[d.r].rules[+d.k]; r[d.f] = d.f === 'qty' ? +val : val; if (d.f === 'match' && !val) delete r.match; }
     else if (d.re) { SD.recipes[d.re].label = val; SD.recipes[d.re].example = val === 'example'; }
   });
-  $('tab-settings').addEventListener('change', (e) => { if (e.target.dataset.r || e.target.dataset.f === 'costPerUnit') drawSettings(); });
-  $('tab-settings').addEventListener('click', async (e) => {
+  if ($('tab-settings')) $('tab-settings').addEventListener('change', (e) => { if (e.target.dataset.r || e.target.dataset.f === 'costPerUnit') drawSettings(); });
+  if ($('tab-settings')) $('tab-settings').addEventListener('click', async (e) => {
     const b = e.target.closest('button'); if (!b) return;
     if (b.id === 'addV') { dirtySettings = true; SD.vendors.push({ id: 'v-' + Date.now().toString(36), name: 'New vendor', phone: '', placeholder: true }); return drawSettings(); }
     if (b.dataset.ra) { dirtySettings = true; SD.recipes[b.dataset.ra].rules.push({ ing: SD.ingredients[0].id, qty: 0.1 }); return drawSettings(); }
@@ -465,8 +486,8 @@
     }
     return stocks;
   }
-  $('tab-settings').addEventListener('change', (e) => { if (e.target.id === 'impFile' && e.target.files[0]) { const f = e.target.files[0]; if (f.size > 200000) return toast('File too big'); f.text().then(t => { $('impText').value = t; toast('File loaded, tap Preview'); }); } });
-  $('tab-settings').addEventListener('click', async (e) => {
+  if ($('tab-settings')) $('tab-settings').addEventListener('change', (e) => { if (e.target.id === 'impFile' && e.target.files[0]) { const f = e.target.files[0]; if (f.size > 200000) return toast('File too big'); f.text().then(t => { $('impText').value = t; toast('File loaded, tap Preview'); }); } });
+  if ($('tab-settings')) $('tab-settings').addEventListener('click', async (e) => {
     const b = e.target.closest('button'); if (!b) return;
     if (b.id === 'impPrev') {
       IMP = buildImport($('impText').value || '');
@@ -599,7 +620,7 @@
     }
     $('tab-admin').innerHTML = h;
   }
-  $('tab-admin').addEventListener('click', async (e) => {
+  if ($('tab-admin')) $('tab-admin').addEventListener('click', async (e) => {
     const b = e.target.closest('button'); if (!b) return;
     if (b.id === 'nuAdd') {
       try { const j = await api('status', { admin: { op: 'user-add', name: $('nuName').value, role: $('nuRole').value, pin: $('nuPin').value } }); adminUsers = j.users; toast('User added'); renderAdmin(); }
@@ -712,7 +733,7 @@
     promoImageId = fin.imageId; promoImagePreview = fin.preview;
     toast('Picture saved'); renderPromo();
   }
-  $('tab-promo').addEventListener('change', (e) => {
+  if ($('tab-promo')) $('tab-promo').addEventListener('change', (e) => {
     const t = e.target;
     if (t.id === 'promoSponsor') { promoSponsor = t.checked; refreshPromoPreview().catch(err => toast('⚠️ ' + err.message)); }
     if (t.id === 'promoRepeat') promoRepeat = t.checked;
@@ -722,7 +743,7 @@
     if (t.dataset.pg) { const id = t.dataset.pg; promoAud.groups = t.checked ? [...new Set(promoAud.groups.concat(id))] : promoAud.groups.filter(x => x !== id); }
     if (t.id === 'promoFile') uploadPromoFile(t.files[0]).catch(err => toast('⚠️ ' + err.message));
   });
-  $('tab-promo').addEventListener('click', async (e) => {
+  if ($('tab-promo')) $('tab-promo').addEventListener('click', async (e) => {
     const b = e.target.closest('button'); if (!b) return;
     if (b.dataset.pv) { promoView = b.dataset.pv; return renderPromo(); }
     if (b.dataset.pl) { promoList = b.dataset.pl; return renderPromo(); }
