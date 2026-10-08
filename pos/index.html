@@ -14,7 +14,7 @@
 <div class="demo-banner"><b>DEMO POS</b> · cash only · costs are <b>market estimates / examples</b>, portions estimated, vendors placeholders, until the owner confirms real numbers</div>
 <header class="top">
   <div class="brand"><img class="logo" src="../images/logo.webp" alt="Unruly Taste" width="62" height="48"><div><b>Point of Sale</b><span id="syncState" class="sync">connecting…</span></div></div>
-  <div class="top-acts"><button class="helpbtn" type="button" data-help title="Help &amp; FAQ" aria-label="Help and FAQ"><span>?</span><em>Help</em></button><button class="bell" id="bell" type="button" title="Low stock"><span>🔔</span><i id="bellCount" class="hidden">0</i></button></div>
+  <div class="top-acts"><button class="helpbtn" type="button" data-help title="Help &amp; FAQ" aria-label="Help and FAQ"><span>?</span><em>Help</em></button><button class="pqbtn" id="pqBtn" type="button" title="Print queue (receipts)" aria-label="Print queue"><span>🖨️</span><i id="pqCount" class="hidden">0</i></button><button class="bell" id="bell" type="button" title="Low stock"><span>🔔</span><i id="bellCount" class="hidden">0</i></button></div>
 </header>
 <nav class="tabs" id="tabs" aria-label="POS sections">
   <button data-tab="orders" class="on" aria-current="page"><em class="ti" aria-hidden="true">🧾</em><span>Orders</span><i id="openCount" class="cnt hidden"></i></button>
@@ -43,8 +43,12 @@
   </form>
 </div>
 <div id="toast" class="toast hidden" role="status"></div>
+<div id="printArea" aria-hidden="true"></div>
 <script src="../config.js"></script>
 <script src="../menu.js"></script>
+<script src="vendor/qrcode.js"></script>
+<script src="receipt.js"></script>
+<script src="printer/driver.js"></script>
 <script src="pos.js"></script>
 <script src="faq.js"></script>
 </body>

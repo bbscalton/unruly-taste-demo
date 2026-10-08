@@ -97,6 +97,8 @@
     $('openCount').textContent = open; $('openCount').classList.toggle('hidden', !open);
     $('lowCount').textContent = low; $('lowCount').classList.toggle('hidden', !low);
     $('bellCount').textContent = low; $('bellCount').classList.toggle('hidden', !low);
+    const pq = D.printQueued || 0; $('pqCount').textContent = pq; $('pqCount').classList.toggle('hidden', !pq);
+    processPrintQueue();
     if (tab === 'orders') renderOrders();
     else if (tab === 'walkin') renderWalkin();
     else if (tab === 'stock') renderStock();
@@ -133,6 +135,7 @@
     if (o.status === 'new') acts = '<button class="btn" data-st="preparing" data-no="' + esc(o.no) + '">Start preparing</button>';
     if (o.status === 'new' || o.status === 'preparing') acts += '<button class="btn green" data-ready="' + esc(o.no) + '">✅ Ready</button>';
     if (o.status === 'ready') acts = '<button class="btn primary" data-st="collected" data-no="' + esc(o.no) + '">Collected</button>';
+    acts += '<button class="btn" data-rcpt="' + esc(o.no) + '">🧾 ' + (printedNos().has(o.no) ? 'Reprint' : 'Print receipt') + '</button>';
     return '<div class="card order"><div class="oh"><span class="ono">' + esc(o.no) + '</span>' + (o.test ? '<span class="tag test">test</span>' : '') +
       '<span class="tag ' + o.source + '">' + SRC[o.source] + '</span><span class="tag ' + o.status + '">' + o.status + '</span></div>' +
       '<div class="who">' + who + '<br><span class="muted small">' + time(o.createdAt) + (dayOf(o.createdAt) !== today() ? ' · ' + dayOf(o.createdAt) : '') + (o.botSource ? ' · via ' + (BOT[o.botSource] || o.botSource) : '') + '</span></div>' +
@@ -151,6 +154,7 @@
     if (t.dataset.st && t.dataset.no) return act('status', { no: t.dataset.no, status: t.dataset.st }, 'Order ' + t.dataset.no + ': ' + t.dataset.st);
     if (t.dataset.ready) return readyDialog(t.dataset.ready);
     if (t.dataset.price) return priceDialog(t.dataset.price, +t.dataset.idx);
+    if (t.dataset.rcpt) { const o = D.orders.find(x => x.no === t.dataset.rcpt); if (o) receiptSheet(o); }
   });
   $('tab-orders').addEventListener('click', (e) => { const t = e.target.closest('button[data-st]:not([data-no])'); if (t) { fStat = t.dataset.st; renderOrders(); } });
   async function act(action, body, okMsg) {
@@ -234,7 +238,8 @@
     if (b.id === 'complete') {
       b.disabled = true;
       const j = await act('walkin', { lines: ticket.map(l => ({ id: l.id, qty: l.qty, ch: l.ch, price: l.manual ? l.unit : undefined })), tendered: +tendered, name: custName, note: custNote }, 'Sale saved');
-      if (j && j.order) { toast('✅ ' + j.order.no + ' saved · change ' + money(j.order.cash.change), 6000); ticket = []; tendered = ''; custName = ''; custNote = ''; renderTicket(); }
+      if (j && j.order) { toast('✅ ' + j.order.no + ' saved · change ' + money(j.order.cash.change), 6000); ticket = []; tendered = ''; custName = ''; custNote = ''; renderTicket();
+        receiptSheet(j.order, null, '✅ Sale saved · change ' + money(j.order.cash.change)); }
       else b.disabled = false;
     }
   });
@@ -306,7 +311,7 @@
   // ---------- SETTINGS ----------
   let SD = null;   // editable copy
   function renderSettings() {
-    SD = { vendors: JSON.parse(JSON.stringify(D.vendors)), ingredients: D.ingredients.map(i => ({ id: i.id, name: i.name, unit: i.unit, costPerUnit: i.costPerUnit, costLabel: labelOf(i), costSource: i.costSource || null, vendorId: i.vendorId, min: { ...i.min } })), recipes: JSON.parse(JSON.stringify(D.recipes)), settings: { readyText: D.settings.readyText, readyTextDelivery: D.settings.readyTextDelivery, lowStockWhatsApp: D.settings.lowStockWhatsApp } };
+    SD = { vendors: JSON.parse(JSON.stringify(D.vendors)), ingredients: D.ingredients.map(i => ({ id: i.id, name: i.name, unit: i.unit, costPerUnit: i.costPerUnit, costLabel: labelOf(i), costSource: i.costSource || null, vendorId: i.vendorId, min: { ...i.min } })), recipes: JSON.parse(JSON.stringify(D.recipes)), settings: { readyText: D.settings.readyText, readyTextDelivery: D.settings.readyTextDelivery, lowStockWhatsApp: D.settings.lowStockWhatsApp, printer: { ...PR() }, receipt: { ...RS() } } };
     drawSettings();
   }
   function drawSettings() {
@@ -316,6 +321,15 @@
       '<div class="field"><label>Pickup message ({name} {no} {total})</label><textarea data-s="readyText" rows="3">' + esc(SD.settings.readyText) + '</textarea></div>' +
       '<div class="field"><label>Delivery message</label><textarea data-s="readyTextDelivery" rows="3">' + esc(SD.settings.readyTextDelivery) + '</textarea></div>' +
       '<label class="small"><input type="checkbox" data-s="lowStockWhatsApp"' + (SD.settings.lowStockWhatsApp ? ' checked' : '') + '> Send low-stock WhatsApp alerts to the shop\'s own chat</label></div>';
+    const drv = window.UTPrinter ? UTPrinter.list() : [{ id: 'none', label: 'No printer yet' }];
+    h += '<h3>Receipts &amp; printer</h3><div class="card">' +
+      '<p class="muted small">No receipt printer is installed yet. Every walk-in and online order still gets a receipt in the <b>print queue</b> (🖨️ at the top), marked "ready to print, no printer". You can preview, print with the browser, save as PDF or download .txt from any order.</p>' +
+      '<label class="small"><input type="checkbox" data-sp="autoPrint"' + (SD.settings.printer.autoPrint !== false ? ' checked' : '') + '> Auto-print: add a receipt to the print queue for every new walk-in and online order</label>' +
+      '<div class="field"><label>Paper width</label><select data-sp="paperWidth" style="width:auto"><option value="80"' + (+SD.settings.printer.paperWidth !== 58 ? ' selected' : '') + '>80 mm (48 characters)</option><option value="58"' + (+SD.settings.printer.paperWidth === 58 ? ' selected' : '') + '>58 mm (32 characters)</option></select></div>' +
+      '<div class="field"><label>Printer driver</label><select data-sp="driver" style="width:auto;max-width:100%">' + drv.map(d => '<option value="' + esc(d.id) + '"' + (d.id === SD.settings.printer.driver ? ' selected' : '') + (d.stub ? ' disabled' : '') + '>' + esc(d.label) + '</option>').join('') + '</select><div class="hint small muted">When the printer arrives: add its driver (pos/printer/driver.js) and pick it here. That is the only switch.</div></div>' +
+      '<label class="small"><input type="checkbox" data-sr="showPhone"' + (SD.settings.receipt.showPhone ? ' checked' : '') + '> Business phone on receipt</label>' +
+      '<div class="field"><label>Business phone (receipts only)</label><input data-sr="phone" value="' + esc(SD.settings.receipt.phone || '') + '" maxlength="20" placeholder="(not set)" style="max-width:220px"></div>' +
+      '<label class="small"><input type="checkbox" id="printStation"' + (localStorage.getItem(PS_KEY) === '1' ? ' checked' : '') + '> This device is the print station (prints queued receipts automatically once a real printer driver is chosen)</label></div>';
     h += '<h3>Ingredients &amp; costs</h3><div class="scroll"><table class="t"><tr><th>Name</th><th>Unit</th><th>Cost / unit (G$)</th><th>Label</th><th>Source</th><th>Low-stock minimum</th><th>Vendor</th></tr>' + SD.ingredients.map((i, k) =>
       '<tr><td><input data-i="' + k + '" data-f="name" value="' + esc(i.name) + '"></td><td><input data-i="' + k + '" data-f="unit" value="' + esc(i.unit) + '" style="min-width:55px"></td><td><input type="number" step="0.01" data-i="' + k + '" data-f="costPerUnit" value="' + i.costPerUnit + '"></td>' +
       '<td><select data-i="' + k + '" data-f="costLabel" style="width:auto">' + Object.keys(LBL).map(l => '<option value="' + l + '"' + (i.costLabel === l ? ' selected' : '') + '>' + LBL[l][1] + '</option>').join('') + '</select></td>' +
@@ -345,7 +359,10 @@
   $('tab-settings').addEventListener('input', (e) => {
     const t = e.target, d = t.dataset; dirtySettings = true;
     const val = t.type === 'checkbox' ? t.checked : t.value;
-    if (d.s) SD.settings[d.s] = val;
+    if (t.id === 'printStation') { localStorage.setItem(PS_KEY, t.checked ? '1' : '0'); dirtySettings = false; return toast(t.checked ? 'This device is the print station' : 'Print station off on this device'); }
+    if (d.sp) SD.settings.printer[d.sp] = d.sp === 'paperWidth' ? +val : val;
+    else if (d.sr) SD.settings.receipt[d.sr] = val;
+    else if (d.s) SD.settings[d.s] = val;
     else if (d.i) { const i = SD.ingredients[+d.i]; if (d.f === 'costLabel') { i.costLabel = val; if (val === 'real') i.costSource = { name: 'Owner-confirmed', date: today(), note: 'Set in POS Settings' }; } else if (d.f === 'minKind') i.min.kind = val; else if (d.f === 'minValue') i.min.value = +val; else if (d.f === 'costPerUnit') i.costPerUnit = +val; else i[d.f] = val; }
     else if (d.v) SD.vendors[+d.v][d.f] = val;
     else if (d.r) { const r = SD.recipes[d.r].rules[+d.k]; r[d.f] = d.f === 'qty' ? +val : val; if (d.f === 'match' && !val) delete r.match; }
@@ -443,6 +460,95 @@
       catch (err) { toast('⚠️ ' + err.message, 6000); b.disabled = false; } finally { busy = false; }
     }
   });
+
+  // ---------- RECEIPTS + PRINT QUEUE ----------
+  const PS_KEY = 'ut_print_station';
+  const PR = () => (D && D.settings.printer) || { autoPrint: true, paperWidth: 80, driver: 'none' };
+  const RS = () => (D && D.settings.receipt) || { showPhone: false, phone: '' };
+  const printedNos = () => new Set((D && D.printQueue || []).filter(j => j.status === 'printed').map(j => j.no));
+  const BIZ = RAW.business || {};
+  const qrSvg = (u) => { try { if (typeof qrcode !== 'function') return ''; const q = qrcode(0, 'M'); q.addData(u); q.make(); return q.createSvgTag({ cellSize: 2, margin: 0, scalable: true, alt: 'QR code: order again' }); } catch (e) { return ''; } };
+  function rcOpts(width) {
+    const items = {}; M.items.forEach(i => { if (i.day != null) items[i.id] = { day: i.day, dayName: i.dayName }; });
+    return { width: +width === 58 ? 58 : 80, business: { name: BIZ.name || 'Unruly Taste', address: BIZ.pickupAddress || BIZ.address || '', phone: RS().phone || '' }, showPhone: !!RS().showPhone,
+      siteUrl: CFG.SITE_URL || '', items, logo: '../images/logo.webp', qrSvg };
+  }
+  function receiptJob(o, width) {
+    const opt = rcOpts(width), lines = UTReceipt.escpos(o, opt);
+    return { no: o.no, width: opt.width, html: UTReceipt.html(o, opt), text: UTReceipt.text(o, opt), lines, bytes: UTReceipt.escposBytes(lines) };
+  }
+  function browserPrint(job) {
+    const area = $('printArea'); area.innerHTML = job.html;
+    let st = $('pageSize'); if (!st) { st = document.createElement('style'); st.id = 'pageSize'; document.head.appendChild(st); }
+    st.textContent = '@page { size: ' + job.width + 'mm auto; margin: 0; }';
+    document.body.classList.add('printing');
+    const done = () => { document.body.classList.remove('printing'); area.innerHTML = ''; window.removeEventListener('afterprint', done); };
+    window.addEventListener('afterprint', done); setTimeout(() => window.print(), 50); setTimeout(done, 60000);
+  }
+  window.UTReceiptUI = { browserPrint };
+  function download(name, text) { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], { type: 'text/plain;charset=utf-8' })); a.download = name; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 500); }
+  function receiptSheet(o, width, title) {
+    let w = +(width || PR().paperWidth) === 58 ? 58 : 80;
+    const drv = window.UTPrinter ? UTPrinter.get(PR().driver) : null;
+    const draw = () => {
+      const job = receiptJob(o, w);
+      openSheet((title ? '<div class="note green small"><b>' + esc(title) + '</b></div>' : '') +
+        '<h3>🧾 Receipt ' + esc(o.no) + (printedNos().has(o.no) ? ' <span class="tag ready">printed before</span>' : '') + '</h3>' +
+        '<div class="chips"><button class="chip ' + (w === 80 ? 'on' : '') + '" data-rw="80">80 mm</button><button class="chip ' + (w === 58 ? 'on' : '') + '" data-rw="58">58 mm</button></div>' +
+        '<div class="rc-stage">' + job.html + '</div>' +
+        '<div class="note small">🖨️ Printer: <b>' + esc(drv ? drv.label : 'none') + '</b>. ' + (PR().driver === 'none' ? 'No receipt printer installed yet: use Print (any printer this device has) or Save as PDF.' : '') + '</div>' +
+        '<div class="acts rc-acts"><button class="btn primary" data-rp="print">🖨️ Print</button><button class="btn" data-rp="pdf">📄 Save as PDF</button><button class="btn" data-rp="txt">⬇️ Download .txt</button><button class="btn" data-rp="queue">➕ Add to print queue</button><button class="btn" data-close>Close</button></div>');
+      $('sheetPanel').onclick = async (e) => {
+        const b = e.target.closest('button'); if (!b) return;
+        if (b.dataset.rw) { w = +b.dataset.rw; return draw(); }
+        if (b.dataset.rp === 'print') return browserPrint(job);
+        if (b.dataset.rp === 'pdf') { toast('In the print dialog choose "Save as PDF" as the printer.', 5000); return browserPrint(job); }
+        if (b.dataset.rp === 'txt') return download('receipt-' + o.no + '-' + w + 'mm.txt', job.text);
+        if (b.dataset.rp === 'queue') { b.disabled = true; const j = await act('status', { print: { op: 'queue', no: o.no } }, 'Added to the print queue'); if (j && j.already) toast('Already in the print queue (' + j.job.note + ')'); b.disabled = false; }
+      };
+    };
+    draw();
+  }
+  const PQS = { queued: 'ph', printed: 'ready', skipped: 'collected' };
+  function queueSheet() {
+    const q = (D && D.printQueue) || [];
+    let h = '<h3>🖨️ Print queue</h3><p class="muted small">Every new walk-in and online order gets one receipt here automatically' + (PR().autoPrint === false ? ' (<b>auto-print is OFF</b> in Settings)' : '') + '. Printer driver: <b>' + esc(PR().driver) + '</b>' + (PR().driver === 'none' ? ' (no printer installed yet, so receipts wait here as "ready to print").' : '.') + '</p>';
+    h += q.length ? '<div class="pq-list">' + q.map(j => '<div class="pq-row"><div><b>' + esc(j.no) + '</b> <span class="tag ' + (PQS[j.status] || '') + '">' + esc(j.status) + '</span>' + (j.kind === 'reprint' ? ' <span class="tag">reprint</span>' : '') +
+      '<div class="muted small">' + time(j.at) + (dayOf(j.at) !== today() ? ' · ' + dayOf(j.at) : '') + ' · ' + esc(j.trigger) + ' · ' + j.width + ' mm · ' + esc(j.note || '') + '</div></div><div class="pq-acts">' +
+      '<button class="btn sm" data-pqv="' + esc(j.id) + '">Preview</button>' + (j.status === 'queued' ? '<button class="btn sm" data-pqm="printed" data-id="' + esc(j.id) + '">Mark printed</button><button class="btn sm" data-pqm="skipped" data-id="' + esc(j.id) + '">Skip</button>' : '') + '</div></div>').join('') + '</div>'
+      : '<div class="empty card">No receipts yet. The next walk-in or online order will appear here.</div>';
+    h += '<div class="acts">' + (D && D.printQueued ? '<button class="btn" id="pqClear">Skip all queued</button>' : '') + '<button class="btn" data-close>Close</button></div>';
+    openSheet(h);
+    $('sheetPanel').onclick = async (e) => {
+      const b = e.target.closest('button'); if (!b) return;
+      if (b.dataset.pqv) {
+        const j = q.find(x => x.id === b.dataset.pqv), o = j && D.orders.find(x => x.no === j.no);
+        if (o) return receiptSheet(o, j.width);
+        try { const r = await api('status', { print: { op: 'get', id: b.dataset.pqv } }); openSheet('<h3>🧾 ' + esc(r.job.no) + '</h3><pre class="rc-text">' + esc(r.job.text) + '</pre><div class="acts"><button class="btn" data-close>Close</button></div>'); } catch (err) { toast('⚠️ ' + err.message); }
+        return;
+      }
+      if (b.dataset.pqm) { await act('status', { print: { op: 'mark', id: b.dataset.id, status: b.dataset.pqm } }, 'Receipt ' + b.dataset.pqm); return queueSheet(); }
+      if (b.id === 'pqClear') { if (!confirm('Mark all queued receipts as skipped?')) return; await act('status', { print: { op: 'clear' } }, 'Queue cleared'); return queueSheet(); }
+    };
+  }
+  $('pqBtn').addEventListener('click', () => { if (D) queueSheet(); });
+  // Auto-print (print station only, real driver only). With driver "none" this does nothing.
+  let printing = false;
+  async function processPrintQueue() {
+    if (printing || !D || !window.UTPrinter || localStorage.getItem(PS_KEY) !== '1') return;
+    const drv = UTPrinter.get(PR().driver);
+    if (!drv || drv.id === 'none' || drv.stub || drv.interactive) return;
+    const jobs = (D.printQueue || []).filter(j => j.status === 'queued').reverse();
+    if (!jobs.length || !(await drv.available())) return;
+    printing = true;
+    try {
+      for (const j of jobs) {
+        const o = D.orders.find(x => x.no === j.no); if (!o) continue;
+        const r = await drv.print(receiptJob(o, j.width));
+        await api('status', { print: { op: 'mark', id: j.id, status: r.ok ? 'printed' : 'queued', note: r.ok ? 'printed' : 'print failed: ' + String(r.error || r.reason || '').slice(0, 50), driver: drv.id } });
+      }
+    } catch (e) { toast('⚠️ Printer: ' + e.message); } finally { printing = false; }
+  }
 
   // ---------- boot ----------
   if (!RAW || !CFG.ASSISTANT_API) { document.body.innerHTML = '<p style="padding:20px">POS not configured.</p>'; return; }

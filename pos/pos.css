@@ -139,3 +139,33 @@ html.faq-open, html.faq-open body { overflow:hidden; }
   .cnt { position:static; margin-left:2px; }
 }
 @media (prefers-reduced-motion: reduce) { .tabs button, .tabs button .ti { transition:none; } .cnt.warn { animation:none; } }
+
+/* ---------- Receipts + print queue (8 Oct 2026) ---------- */
+.pqbtn { position:relative; background:transparent; border:1px solid #fff6; color:#fff; border-radius:10px; padding:6px 10px; font-size:1.05rem; cursor:pointer; }
+.pqbtn i { position:absolute; top:-6px; right:-6px; background:#2563eb; color:#fff; font-style:normal; font-size:.7rem; font-weight:700; border-radius:10px; padding:1px 6px; border:2px solid #111; }
+.note.green { background:#e9f8ee; border-color:#9fdcb3; }
+.rc-stage { background:repeating-linear-gradient(45deg,#ece7e1 0 10px,#e4ded7 10px 20px); border-radius:12px; padding:14px 8px; margin:8px 0; overflow:auto; display:flex; justify-content:center; }
+.rc { background:#fff; color:#000; font-family:"Courier New",ui-monospace,Menlo,Consolas,monospace; font-size:12px; line-height:1.35; padding:4mm 3mm 6mm; box-shadow:0 4px 14px #0003; box-sizing:content-box; }
+.rc-80 { width:72mm; } .rc-58 { width:48mm; font-size:11px; }
+.rc-logo { display:block; width:22mm; margin:0 auto 2px; filter:grayscale(1) contrast(1.4); }
+.rc-shop { text-align:center; font-weight:900; font-size:1.35em; letter-spacing:.06em; text-transform:uppercase; }
+.rc-c { text-align:center; } .rc-s { font-size:.92em; }
+.rc hr { border:0; border-top:1px dashed #000; margin:5px 0; } .rc .rc-hr2 { border-top:3px double #000; }
+.rc-row { display:flex; justify-content:space-between; gap:8px; } .rc-row > :last-child { text-align:right; }
+.rc-item { margin:3px 0; } .rc-sub { padding-left:4mm; font-size:.92em; } .rc-day { font-weight:700; }
+.rc-total { font-weight:900; font-size:1.2em; margin:2px 0; }
+.rc-test { text-align:center; font-weight:900; border:2px solid #000; padding:2px; margin:4px 0; }
+.rc-qr { display:flex; justify-content:center; margin:4px 0; } .rc-qr svg { width:26mm; height:26mm; } .rc-58 .rc-qr svg { width:22mm; height:22mm; }
+.rc-link { font-size:.78em; word-break:break-all; }
+.rc-thanks { text-align:center; font-weight:900; margin-top:6px; }
+.rc-acts { flex-wrap:wrap; } .rc-text { background:#fff; border:1px solid #ddd; padding:8px; font-size:12px; overflow:auto; }
+.pq-list { display:flex; flex-direction:column; gap:6px; max-height:55vh; overflow:auto; }
+.pq-row { display:flex; justify-content:space-between; align-items:center; gap:8px; border:1px solid #e5e0da; border-radius:10px; padding:8px 10px; background:#fff; }
+.pq-acts { display:flex; gap:4px; flex-wrap:wrap; justify-content:flex-end; }
+#printArea { display:none; }
+@media print {
+  html, body.printing { background:#fff !important; } body.printing { padding:0 !important; margin:0 !important; }
+  body.printing > *:not(#printArea) { display:none !important; }
+  body.printing #printArea { display:block !important; }
+  body.printing .rc { box-shadow:none; padding:0 0 4mm; margin:0 auto; }
+}
