@@ -32,7 +32,7 @@
       weekday: Number({ Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 }[new Intl.DateTimeFormat('en-US', { timeZone: tz, weekday: 'short' }).format(d)]),
       dayName: new Intl.DateTimeFormat('en-US', { timeZone: tz, weekday: 'long' }).format(d),
       ymd: get({ year: '2-digit' }) + get({ month: '2-digit' }) + get({ day: '2-digit' }),
-      label: new Intl.DateTimeFormat('en-GB', { timeZone: tz, weekday: 'short', day: 'numeric', month: 'short', year: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true }).format(d) + ' (Guyana)'
+      label: new Intl.DateTimeFormat('en-GB', { timeZone: tz, weekday: 'short', day: 'numeric', month: 'short', year: 'numeric', hour: 'numeric', minute: '2-digit', hourCycle: 'h12' }).format(d) + ' (Guyana)'
     };
   }
   var toastT;
@@ -182,7 +182,7 @@
   function renderCartBar() {
     var n = cartCount();
     $('cartBar').classList.toggle('hidden', !n || !$('done').classList.contains('hidden'));
-    $('cartCount').textContent = n; $('cartTotalBar').textContent = money(cartTotal()) + (cartHasAsk() ? ' + TBC' : '');
+    $('cartCount').textContent = n; $('cartTotalBar').textContent = (cartTotal() || !cartHasAsk()) ? money(cartTotal()) + (cartHasAsk() ? ' + TBC' : '') : 'Price TBC';
   }
   function renderCart() {
     if (!cart.length) {
@@ -203,7 +203,7 @@
         });
       });
     }
-    $('cartTotal').textContent = money(cartTotal()) + (cartHasAsk() ? ' + box price' : '');
+    $('cartTotal').textContent = (cartTotal() || !cartHasAsk()) ? money(cartTotal()) + (cartHasAsk() ? ' + box price' : '') : 'Price to confirm';
     $('checkout').classList.toggle('hidden', !cart.length);
   }
   $('cartBar').addEventListener('click', function () { renderCart(); openModal('cartModal'); });
@@ -269,7 +269,7 @@
       '-----',
       items,
       '-----',
-      '*Total: ' + money(o.total) + '*' + (o.ask ? ' + box price (confirmed on WhatsApp)' : '') + (o.delivery ? ' + delivery' : ''),
+      '*Total: ' + (o.total || !o.ask ? money(o.total) + '*' + (o.ask ? ' + box price (confirmed on WhatsApp)' : '') : 'price to confirm*') + (o.delivery ? ' + delivery' : ''),
       ful,
       'Pay on ' + (o.delivery ? 'delivery' : 'pickup') + '.',
       '',
@@ -292,7 +292,7 @@
       '',
       '*Items:*',
       items,
-      '*Total: ' + money(o.total) + '*' + (o.ask ? ' + box price' : '') + (o.delivery ? ' + delivery charge' : ''),
+      '*Total: ' + (o.total || !o.ask ? money(o.total) + '*' + (o.ask ? ' + box price' : '') : 'PRICE TO CONFIRM*') + (o.delivery ? ' + delivery charge' : ''),
       o.ask ? '⚠️ *PRICE TO CONFIRM:* Hot Box / Wrap Box has no posted solo price. Reply to the customer with the final total.' : '',
       '',
       '===== RECEIPT FOR CUSTOMER =====',
