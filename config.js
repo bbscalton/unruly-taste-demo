@@ -18,5 +18,8 @@ window.UT_CONFIG = {
   DEMO: true,                              // shows the DEMO banner + "(DEMO)" in order messages
   DEFAULT_COUNTRY_CODE: '592',             // customers' numbers default to Guyana
   TIME_ZONE: 'America/Guyana',
-  CURRENCY: 'G$'
+  CURRENCY: 'G$',
+  // AI order assistant behind the header "Call" (voice) and "WhatsApp" (text chat) buttons. Public API path only, no keys here.
+  // Set to '' to make the two buttons go back to a plain phone call / WhatsApp link.
+  ASSISTANT_API: 'https://gdb.neuereatec.org/unruly/api'
 };
