@@ -108,7 +108,7 @@
         (s.id === 'wings' ? '<p class="flv"><b>12 flavours:</b> ' + FLAVOURS.map(esc).join(' · ') + '</p>' : '') + '<div class="grid">';
       MENU.filter(function (m) { return m.sec === s.id; }).forEach(function (m) {
         var tag = m.day ? '<span class="tag' + (now.weekday === m.day ? ' today' : '') + '">' + (now.weekday === m.day ? 'TODAY' : m.dayName + 's') + '</span>' : '';
-        html += '<button type="button" class="item" data-id="' + m.id + '"><img src="images/' + m.img + '" alt="' + esc(m.name) + ' (demo illustration)" loading="lazy" width="640" height="480">' +
+        html += '<button type="button" class="item" data-id="' + m.id + '"><img src="images/' + m.img + '" alt="' + esc(m.name) + '" loading="lazy" width="640" height="480">' +
           '<span class="t"><h3>' + esc(m.name) + tag + '</h3><p>' + esc(m.desc) + '</p><span class="pr">' +
           (m.price ? '<span class="price">' + money(m.price) + '</span><span class="addb">Add +</span>'
                    : '<span class="price ask">Price on WhatsApp</span><span class="addb">Add +</span>') +
@@ -131,7 +131,7 @@
   function openItem(id) {
     var item = BY_ID[id];
     cur = { item: item, ch: item.groups.map(function () { return -1; }), q: 1 };
-    $('itemImg').src = 'images/' + item.img; $('itemImg').alt = item.name + ' (demo illustration)';
+    $('itemImg').src = 'images/' + item.img; $('itemImg').alt = item.name;
     $('itemTitle').textContent = item.name + (item.price ? ' · ' + money(item.price) : '');
     $('itemDesc').textContent = item.desc;
     $('itemErr').textContent = '';

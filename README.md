@@ -21,7 +21,7 @@ from the live site and builds its spoken menu from it, so page and bot stay in s
 number.** Swap it (and `ORDER_WHATSAPP_DISPLAY`, `DEMO: false`) once Unruly Taste approves.
 
 ## Images
-All food images are generated demo illustrations. See `images/README.md` for the list of slots to swap.
+Food photos, logo and share card are Unruly Taste's real, approved photos (cropped/optimised). See `images/README.md` for which file is used where.
 
 ## Plan / not built yet
 See `PLAN.md` (auto-receipt via the WhatsApp bridge, "ready for pickup" callback, voice ordering).

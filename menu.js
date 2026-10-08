@@ -80,7 +80,7 @@ window.UT_MENU = {
    "price": 5000,
    "day": 4,
    "dayName": "Thursday",
-   "img": "deal-thursday-double-bubble.svg",
+   "img": "deal-thursday-double-bubble.webp",
    "desc": "Any 2 boxes (Hot Box or Wrap Box), each with wings or strip chicken, for one price.",
    "groups": [
     {
@@ -136,7 +136,7 @@ window.UT_MENU = {
    "price": 6000,
    "day": 5,
    "dayName": "Friday",
-   "img": "deal-friday-mega-meal.svg",
+   "img": "deal-friday-mega-meal.webp",
    "desc": "1 Hot Box + 1 Wrap Box + 2 refreshers.",
    "groups": [
     {
@@ -178,7 +178,7 @@ window.UT_MENU = {
    "sec": "wings",
    "name": "Wings (12pc)",
    "price": 2500,
-   "img": "wings-12pc.svg",
+   "img": "wings-12pc.webp",
    "desc": "12 crispy wings tossed in your choice of 12 flavours.",
    "groups": [
     {
@@ -194,7 +194,7 @@ window.UT_MENU = {
    "sec": "wings",
    "name": "Wings + a Side",
    "price": 2500,
-   "img": "wings-with-side.svg",
+   "img": "wings-with-side.webp",
    "desc": "Wings with your pick of fries, mac & cheese, waffles or plantain.",
    "groups": [
     {
@@ -216,7 +216,7 @@ window.UT_MENU = {
    "sec": "combos",
    "name": "Wings Combo",
    "price": 2500,
-   "img": "wings-combo.svg",
+   "img": "wings-combo.webp",
    "desc": "Wings + fries + mac & cheese.",
    "groups": [
     {
@@ -232,7 +232,7 @@ window.UT_MENU = {
    "sec": "combos",
    "name": "Burger & Wings Combo",
    "price": 2800,
-   "img": "burger-wings-combo.svg",
+   "img": "burger-wings-combo.webp",
    "desc": "Burger + wings, served with fries and dipping sauces.",
    "groups": [
     {
@@ -248,7 +248,7 @@ window.UT_MENU = {
    "sec": "boxes",
    "name": "Hot Box",
    "price": null,
-   "img": "hot-box.svg",
+   "img": "hot-box.webp",
    "desc": "Chicken burger + fries + mac & cheese, with wings or strip chicken. Solo price confirmed on WhatsApp.",
    "groups": [
     {
@@ -274,7 +274,7 @@ window.UT_MENU = {
    "sec": "boxes",
    "name": "Wrap Box",
    "price": null,
-   "img": "wrap-box.svg",
+   "img": "wrap-box.webp",
    "desc": "Tropical chicken wrap + fries + mac & cheese, with wings or strip chicken. Solo price confirmed on WhatsApp.",
    "groups": [
     {
