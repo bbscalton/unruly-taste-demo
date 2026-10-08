@@ -1,0 +1,94 @@
+/* Unruly Taste POS: Help / FAQ overlay (static text only; does not change POS behaviour or data).
+ * Opens from the "?" button in the header (every tab), the Help link on the sign-in screen, or pos/#help. */
+(function () {
+  'use strict';
+  const T = (cls, txt) => '<span class="tag ' + cls + '">' + txt + '</span>';
+  const FAQ = [
+    ['Signing in', [
+      ['How do I sign in the first time?', '<p>Open the POS link, type the <b>staff PIN</b> you were given by Calton or the owner, and tap <b>Sign in</b>. The PIN is never shown on screen. Don\'t write it on the device or share it in group chats.</p>'],
+      ['Where is the PIN saved?', '<p>Only in <b>this browser on this device</b>. It is sent only to the shop\'s own POS server to check it. It is removed if you tap <b>Settings › This device › Sign out</b>, clear the browser\'s data, or use a private/incognito window.</p>'],
+      ['I\'m using a new phone or tablet. What do I do?', '<p>Open the same POS link and sign in with the PIN once. Each device signs in on its own. If a device is lost or a staff member leaves, ask Calton to change the PIN; every device then has to sign in again with the new one.</p>'],
+      ['It says "Too many wrong PIN attempts".', '<p>After <b>8 wrong tries within 15 minutes</b> from the same internet connection, sign-in is blocked for a while (up to 15 minutes). Wait, then type the PIN carefully. Don\'t keep guessing; if you\'re not sure of the PIN, ask Calton.</p>'],
+      ['Why is it asking me to sign in again?', '<p>Either the PIN was changed, or the saved PIN was removed from this browser (sign out, cleared data, private window). Enter the current PIN.</p>'],
+    ]],
+    ['Walk-in sales', [
+      ['How do I ring up a walk-in customer?', '<ol><li>Go to <b>💵 Walk-in</b> and tap an item.</li><li>Choose <b>every option</b> (flavour, side, protein…) and the quantity, then tap <b>Add to ticket</b>. The POS tells you if an option is missing.</li><li>Add more items the same way. Remove a line with ✕, or tap <b>Clear ticket</b> to start over.</li><li>Optional: customer name (for calling out the order) and a note.</li><li>Enter the cash, then tap <b>Complete cash sale</b>.</li></ol><p>The sale gets a number like <b>W-261008-001</b> and shows in Orders as ' + T('new', 'new') + '.</p>'],
+      ['Hot Box and Wrap Box have no price. What do I charge?', '<p>They don\'t have a posted solo price yet ("price to confirm"). When you add one, type the <b>price per box</b> you charged; it\'s saved as a <i>manual price</i> on that sale.</p><p>On WhatsApp/web orders a Hot Box or Wrap Box shows <b class="neg">price TBC</b> with a <b>Set … price</b> button. Tap it and enter the price per box. Until you do, that line is left out of sales and profit.</p>'],
+      ['How do cash tendered and change work?', '<p>Type the cash you received, or tap <b>Exact</b>, <b>1,000</b>, <b>5,000</b>, <b>10,000</b> or <b>20,000</b>. The POS shows <b class="pos">Change: G$…</b> in green, or <b class="neg">Short by G$…</b> in red. <b>Complete cash sale</b> stays greyed out until the cash covers the total. Give change as shown.</p>'],
+      ['I made a mistake on a completed sale.', '<p>There is no void or refund button yet. <b>Don\'t ring the sale again</b> to fix it. Note the order number and time and tell Calton. If ingredients were taken off stock wrongly, correct them on the Stock tab with <b>Count / set</b>.</p>'],
+      ['What does the purple TEST tag mean?', '<p>' + T('test', 'test') + ' marks practice orders (for example a walk-in with "test" in the name or note, or Calton\'s test orders). They still count in Today, so only use test sales when you really need to.</p>'],
+    ]],
+    ['Orders', [
+      ['Where do WhatsApp and web orders come from?', '<p>From the Unruly Taste <b>AI ordering assistant</b>: customers who call the WhatsApp line, and customers using the chat / voice assistant on the website. When the assistant confirms an order it appears in <b>🧾 Orders</b> by itself. Nobody needs to type it in.</p>'],
+      ['How fast do new orders appear?', '<p>The POS checks for new orders <b>every 5 seconds</b> while it\'s open, so new orders show within a few seconds. The header shows <b>● live · time</b> of the last check. If the screen was in the background, it catches up as soon as you open it again.</p>'],
+      ['What do the source tags mean?', '<ul><li>' + T('walk-in', 'walk-in') + ' rung up at the counter (cash).</li><li>' + T('whatsapp', 'whatsapp') + ' a phone call to the WhatsApp line ("via WhatsApp call").</li><li>' + T('web', 'web') + ' the website assistant ("via web chat" or "via web voice").</li><li>' + T('test', 'test') + ' a test order.</li></ul><p>Use the chips at the top (All / Walk-in / WhatsApp / Web, and Open / Collected / All) to filter.</p>'],
+      ['What do the order statuses mean, and how do I move an order along?', '<p>' + T('new', 'new') + ' → tap <b>Start preparing</b> → ' + T('preparing', 'preparing') + ' → tap <b>✅ Ready</b> → ' + T('ready', 'ready') + ' → tap <b>Collected</b> when the customer has it → ' + T('collected', 'collected') + '.</p><p>You can tap Ready straight from New. <b>Open</b> shows everything not collected yet; <b>Collected</b> shows the last 3 days.</p>'],
+      ['What message goes out when I tap Ready?', '<p>A box first shows exactly what will happen; nothing is sent until you tap <b>Yes, it\'s ready</b>. Ready can only be sent once per order.</p><ul><li><b>Right now it is TEST MODE.</b> The "ready for pickup" WhatsApp goes <b>only to the shop\'s own test chat</b>, labelled TEST. It does <b>not</b> go to the customer.</li><li><b>Walk-ins</b> never get a message: call out the order at the counter.</li><li>When Calton switches it to live (needs his OK, set on the shop PC), the message goes <b>only to customers whose WhatsApp number was verified on their call</b>. Orders without a verified number (e.g. website orders) get no message.</li></ul>'],
+      ['Can I change the ready message wording?', '<p>Yes: <b>Settings › Ready messages</b>. <b>{name}</b>, <b>{no}</b> and <b>{total}</b> are filled in for you. Tap <b>Save settings</b>. When live, customers get the WhatsApp line\'s fixed, checked wording.</p>'],
+    ]],
+    ['Receipts', [
+      ['Do customers get a receipt?', '<p>Yes, after a <b>WhatsApp phone order</b>: a WhatsApp receipt is sent automatically a moment after the order is placed. It lists the order number, items and choices, prices, the total (or "price to confirm" for a Hot / Wrap Box) and pickup or delivery details.</p><p>It goes <b>only to the number that called</b>, and only if that matches the number the customer confirmed. If anything is unclear, no receipt is sent and a note goes to the shop\'s own chat instead. <b>Website orders and walk-ins get no receipt.</b> Staff don\'t need to do anything.</p>'],
+    ]],
+    ['Cost and profit', [
+      ['How are cost and profit worked out?', '<p>Each menu item has a <b>recipe</b>: the ingredients and amount per serving. <b>Cost</b> = each amount × that ingredient\'s cost per unit, added up. Options matter (fries cost differently from mac &amp; cheese). <b>Profit</b> = price − cost.</p><p>You see it on the ticket, each order card, the Today tab and Settings › Recipes. Hot / Wrap Box lines without a price yet are left out of the totals.</p>'],
+      ['What do "example", "market estimate" and "real" mean?', '<ul><li>' + T('ex', 'example') + ' a made-up number, just so the POS works.</li><li>' + T('est', 'market estimate') + ' a public Guyana shop price, with the source link and date on the Stock tab. It is <b>not</b> what Unruly Taste actually pays.</li><li>' + T('real', 'real (owner)') + ' a number confirmed by the owner.</li></ul><p>Recipes show ' + T('est', 'estimated portions') + ' until the owner confirms the real amounts.</p>'],
+      ['Are these the restaurant\'s real costs?', '<p><b>Not yet.</b> No costs are marked real yet, so all profit figures are estimates. They become real when the owner fills in the ingredient sheet and the answers are imported (see <i>Bulk import</i>).</p>'],
+    ]],
+    ['Stock', [
+      ['Is stock taken off automatically?', '<p>Yes, using the recipes. <b>Walk-ins:</b> when you tap Complete cash sale. <b>WhatsApp / web orders:</b> as soon as the order arrives in the POS. Marking Ready or Collected doesn\'t change stock. Orders placed before the POS was switched on didn\'t take anything off (their card says so).</p>'],
+      ['How do I restock or do a stock count?', '<p>On <b>📦 Stock</b>, tap <b>+ Restock</b> and enter what was delivered (it is added), or <b>Count / set</b> and enter what you counted on the shelf (it replaces the number). Use the unit shown on the card (kg, L or each).</p>'],
+      ['How do I set a minimum (reorder level)?', '<p><b>Settings › Ingredients &amp; costs › Low-stock minimum.</b> Choose <b>quantity</b> (e.g. 5 kg) or <b>servings</b> (e.g. enough for 8 servings, worked out from the recipes), then tap <b>Save settings</b>.</p>'],
+      ['What happens when something runs low?', '<p>When stock drops below its minimum you see a ' + T('new', 'low') + ' tag, a red bar at the top and a number on the 🔔 bell. The POS also sends <b>one</b> WhatsApp alert to the <b>shop\'s own chat</b> (never to customers or vendors) with the item, amount left and vendor. It won\'t alert again for that item until stock goes back above the minimum and drops again.</p><p>Recent alerts are listed at the bottom of the Stock tab. The WhatsApp alert can be switched on or off in Settings.</p>'],
+      ['What does "call this vendor" mean?', '<p>It\'s a reminder to reorder. Tap the phone number to call. <b>The POS never orders from or messages vendors</b>; ordering is always done by a person. Vendors marked ' + T('ph', 'placeholder') + ' are not real (+592 000 … numbers), so don\'t call them.</p>'],
+    ]],
+    ['Settings and the owner sheet', [
+      ['How do I edit ingredients and costs?', '<p><b>Settings › Ingredients &amp; costs</b>: change the name, unit, cost per unit, label, minimum or vendor. Tap <b>Save settings</b> at the bottom (or <b>Discard changes</b>). Setting the label to ' + T('real', 'real (owner)') + ' marks it as owner-confirmed.</p>'],
+      ['How do I edit a recipe?', '<p><b>Settings › Recipes</b>: tap an item to open it. Change the amount per serving, add a line with <b>+ Ingredient</b>, or remove one with ✕. <b>Only if choice contains</b> makes a line count only when the order\'s choices mention that word (e.g. <i>Fries</i>). Then tap <b>Save settings</b>.</p>'],
+      ['How do I add or edit vendors?', '<p><b>Settings › Vendors</b>: edit the name and phone, untick <b>Placeholder?</b> once it\'s a real supplier, or tap <b>+ Add vendor</b>. Then pick the vendor for each ingredient in the ingredients table and save. Vendor details are only shown to staff and in the low-stock alert.</p>'],
+      ['How do I import the owner\'s ingredient sheet?', '<ol><li>The owner fills in the ingredient sheet (printed or WhatsApp version).</li><li>The answers go into the CSV template (<b>Settings › Bulk import › Download the CSV template</b>).</li><li>Paste the CSV or choose the file, then tap <b>Preview import</b> and check the list.</li><li>Tap <b>Apply import &amp; save</b>.</li></ol><p>Imported costs become ' + T('real', 'real (owner)') + '. Blank cells keep the current value. Recipe rows replace that item\'s recipe (blank amounts keep the current amount). Stock numbers set the count. Hot / Wrap Box prices are only shown: menu prices are changed on the website.</p>'],
+    ]],
+    ['Today', [
+      ['What does the Today tab show?', '<p>Today\'s sales, number of orders, estimated cost and profit, average order, a split by source (walk-in / WhatsApp / web) and items sold. "Today" means since midnight, Guyana time. Hot / Wrap Box lines still waiting for a price aren\'t counted until the price is set. Test orders are included.</p>'],
+    ]],
+    ['Payments', [
+      ['Can customers pay by card or mobile money?', '<p><b>Cash only for now.</b> There are no card payments. Mobile money is planned for later. The POS never takes payments online: WhatsApp and web customers pay on pickup or delivery.</p>'],
+    ]],
+    ['Something looks wrong', [
+      ['The header says "offline", or nothing updates.', '<ol><li>Check the Wi-Fi or mobile data.</li><li>Refresh the page (pull down, or the browser\'s reload button).</li><li>Wait a minute and try again; the shop PC may be restarting.</li></ol><p>Your PIN stays saved. Completed sales and orders are kept on the shop PC. A ticket you haven\'t completed yet is lost on refresh, so note it first.</p>'],
+      ['An order, total or stock number looks wrong.', '<p>Don\'t re-enter sales to "fix" it. Write down the order number and time, take a screenshot, and tell Calton. Stock can be corrected with <b>Count / set</b>.</p>'],
+      ['Who do I contact for help?', '<p><b>Calton (Neuereatec)</b>, through your usual staff contact. Please don\'t post the POS link or PIN anywhere public.</p>'],
+    ]],
+  ];
+
+  let n = 0;
+  const body = FAQ.map(([sec, qs]) => '<section class="faq-sec" data-sec><h3>' + sec + '</h3>' + qs.map(([q, a]) => '<details class="faq-q" id="faq-' + (++n) + '"><summary>' + q + '</summary><div class="faq-a">' + a + '</div></details>').join('') + '</section>').join('');
+  const wrap = document.createElement('div');
+  wrap.id = 'faq'; wrap.className = 'faq hidden'; wrap.setAttribute('role', 'dialog'); wrap.setAttribute('aria-modal', 'true'); wrap.setAttribute('aria-label', 'Help and FAQ');
+  wrap.innerHTML = '<div class="faq-panel"><div class="faq-head"><img class="logo" src="../images/logo.webp" alt="" width="52" height="40"><div><b>Help &amp; FAQ</b><span>Unruly Taste POS · for staff and the owner</span></div><button type="button" class="faq-x" id="faqClose" aria-label="Close help">✕</button></div>' +
+    '<div class="faq-search"><input id="faqQ" type="search" placeholder="Search help (PIN, change, stock…)" autocomplete="off" aria-label="Search help"></div>' +
+    '<div class="faq-body" id="faqBody">' + body + '<div class="empty card hidden" id="faqNone">No help topics match. Try another word, or ask Calton.</div>' +
+    '<p class="muted small faq-foot"><span id="faqCount">' + n + ' questions</span> · This page only explains the POS; it doesn\'t change anything.</p></div></div>';
+  document.body.appendChild(wrap);
+
+  const $ = (id) => document.getElementById(id);
+  let lastFocus = null;
+  function open() { lastFocus = document.activeElement; wrap.classList.remove('hidden'); document.documentElement.classList.add('faq-open'); if (window.matchMedia('(min-width: 700px)').matches) setTimeout(() => $('faqQ').focus({ preventScroll: true }), 30); $('faqBody').scrollTop = 0; }
+  function close() { wrap.classList.add('hidden'); document.documentElement.classList.remove('faq-open'); if (location.hash === '#help') history.replaceState(null, '', location.pathname + location.search); if (lastFocus && lastFocus.focus) lastFocus.focus(); }
+  const norm = (s) => s.toLowerCase().replace(/[^a-z0-9$]+/g, ' ');
+  function filter() {
+    const words = norm($('faqQ').value).split(' ').filter(Boolean); let shown = 0;
+    wrap.querySelectorAll('.faq-sec').forEach(sec => {
+      let any = false;
+      sec.querySelectorAll('.faq-q').forEach(d => { const hit = !words.length || words.every(w => norm(sec.querySelector('h3').textContent + ' ' + d.textContent).includes(w)); d.classList.toggle('hidden', !hit); if (words.length) d.open = hit && words.length > 0; else d.open = false; if (hit) { any = true; shown++; } });
+      sec.classList.toggle('hidden', !any);
+    });
+    $('faqNone').classList.toggle('hidden', shown > 0); $('faqCount').textContent = words.length ? shown + ' of ' + n + ' questions match' : n + ' questions';
+  }
+  $('faqQ').addEventListener('input', filter);
+  $('faqClose').addEventListener('click', close);
+  wrap.addEventListener('click', (e) => { if (e.target === wrap) close(); });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !wrap.classList.contains('hidden')) close(); });
+  document.addEventListener('click', (e) => { if (e.target.closest('[data-help]')) { e.preventDefault(); open(); } });
+  window.addEventListener('hashchange', () => { if (location.hash === '#help') open(); });
+  if (location.hash === '#help') open();
+})();
