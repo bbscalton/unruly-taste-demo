@@ -13,6 +13,12 @@
   const pct = (p, s) => (s > 0 ? Math.round(p / s * 100) + '%' : '–');
   const pm = (n) => '<span class="' + (n < 0 ? 'neg' : 'pos') + '">' + money(n) + '</span>';
   const SRC = { 'walk-in': 'Walk-in', whatsapp: 'WhatsApp', web: 'Web' };
+  // Cost labels: example (made up) · estimate (public Guyana market price, source + date) · real (owner-confirmed)
+  const LBL = { example: ['ex', 'example'], estimate: ['est', 'market estimate'], real: ['real', 'real (owner)'] };
+  const labelOf = (i) => (LBL[i.costLabel] ? i.costLabel : (i.costExample ? 'example' : 'real'));
+  const srcText = (s) => (s ? [s.name, s.pack && s.price ? s.pack + ': ' + s.price : '', s.calc, s.date ? 'seen ' + s.date : '', s.note].filter(Boolean).join(' · ') : '');
+  const costTag = (i) => { const l = labelOf(i), t = srcText(i.costSource); return '<span class="tag ' + LBL[l][0] + '"' + (t ? ' title="' + esc(t) + '"' : '') + '>' + LBL[l][1] + '</span>'; };
+  const recTag = (r) => { const l = r && LBL[r.label] ? r.label : (r && r.example === false ? 'real' : 'example'); return '<span class="tag ' + LBL[l][0] + '">' + (l === 'estimate' ? 'estimated portions' : LBL[l][1]) + '</span>'; };
   const BOT = { phone: 'WhatsApp call', 'web-chat': 'web chat', 'web-voice': 'web voice' };
   const time = (iso) => new Date(iso).toLocaleTimeString('en-US', { timeZone: CFG.TIME_ZONE || 'America/Guyana', hour: 'numeric', minute: '2-digit' });
   const dayOf = (iso) => new Date(iso).toLocaleDateString('en-CA', { timeZone: CFG.TIME_ZONE || 'America/Guyana' });
@@ -93,7 +99,8 @@
     else if (tab === 'today') renderToday();
     else if (tab === 'settings' && (forceSettings || !dirtySettings)) renderSettings();
   }
-  const exampleNote = () => '<div class="note">🧪 <b>Example numbers:</b> ingredient costs, recipes/portions and vendors are <b>examples, Calton to supply</b> the real ones (Settings). Profit shown is an estimate from those examples.</div>';
+  const exampleNote = () => { const n = { example: 0, estimate: 0, real: 0 }; D.ingredients.forEach(i => n[labelOf(i)]++);
+    return '<div class="note">🧪 <b>Costs are not the restaurant\'s real numbers yet.</b> ' + n.estimate + ' ingredients use a <span class="tag est">market estimate</span> (public Guyana shop price; source + date on the Stock tab), ' + n.example + ' are <span class="tag ex">example</span> (made up), ' + n.real + ' are <span class="tag real">real (owner)</span>. Portions are typical fast-food estimates and vendors are placeholders until the owner fills in the ingredient sheet. Profit shown is an estimate.</div>'; };
   const lowBar = () => { const low = D.ingredients.filter(i => i.low); return low.length ? '<div class="alertbar">⚠️ <b>Low stock:</b> ' + low.map(i => esc(i.name) + ' (' + i.stock + ' ' + esc(i.unit) + ')').join(', ') + ' · <u data-go="stock">open Stock</u></div>' : ''; };
   document.addEventListener('click', (e) => { const g = e.target.closest('[data-go]'); if (g) setTab(g.dataset.go); });
 
@@ -129,7 +136,7 @@
       (o.preImport ? '<div class="muted small">Placed before the POS was switched on: stock was not deducted for this one.</div>' : '') +
       '<div class="lines">' + lines + '</div>' +
       '<div class="tot big"><span>Total</span><span>' + money(o.total) + (o.tbc ? ' + TBC' : '') + '</span></div>' +
-      '<div class="tot muted"><span>Est. cost (example)</span><span>' + money(o.cost) + '</span></div>' +
+      '<div class="tot muted"><span>Est. cost' + (o.tbc ? ', priced lines' : '') + '</span><span>' + money(o.cost) + '</span></div>' +
       '<div class="tot"><span>Est. profit</span><span>' + pm(o.profit) + ' <span class="muted small">' + pct(o.profit, o.total) + '</span></span></div>' +
       (o.ready ? '<div class="note blue small">Ready at ' + time(o.ready.at) + ': ' + esc(o.ready.result) + '</div>' : '') +
       (acts ? '<div class="acts">' + acts + '</div>' : '') + '</div>';
@@ -208,7 +215,7 @@
   function renderTicketTotals() {
     const tt = $('ttot'); if (!tt) return;
     const tot = total(), cost = ticket.reduce((s, l) => s + lineCost(l.id, l.choices, l.qty).cost, 0);
-    tt.innerHTML = '<div class="tot big" style="margin-top:8px"><span>Total</span><span>' + money(tot) + '</span></div><div class="tot muted"><span>Est. cost (example)</span><span>' + money(cost) + '</span></div><div class="tot"><span>Est. profit</span><span>' + pm(tot - cost) + ' <span class="muted small">' + pct(tot - cost, tot) + '</span></span></div>';
+    tt.innerHTML = '<div class="tot big" style="margin-top:8px"><span>Total</span><span>' + money(tot) + '</span></div><div class="tot muted"><span>Est. cost (estimates)</span><span>' + money(cost) + '</span></div><div class="tot"><span>Est. profit</span><span>' + pm(tot - cost) + ' <span class="muted small">' + pct(tot - cost, tot) + '</span></span></div>';
     const t = +tendered || 0, chg = $('chg');
     if (chg) chg.innerHTML = !ticket.length ? '' : (t >= tot && t > 0 ? '<div class="change">Change: ' + money(t - tot) + '</div>' : '<div class="change short">' + (t ? 'Short by ' + money(tot - t) : 'Enter cash received') + '</div>');
     const c = $('complete'); if (c) c.disabled = !ticket.length || t < tot || ticket.some(l => l.unit == null);
@@ -236,10 +243,10 @@
       it.groups.forEach((g, i) => { if (!visible(it, g, ch)) return; h += '<div class="field"><label>' + esc(g.label) + '</label><div class="opts">' + g.opts.map((o, k) => '<button class="opt ' + (ch[i] === k ? 'on' : '') + '" data-g="' + i + '" data-k="' + k + '">' + esc(o) + '</button>').join('') + '</div></div>'; });
       if (it.price == null) h += '<div class="field"><label>Price per box (G$): price to confirm, enter what you charge</label><input id="mp" type="number" inputmode="numeric" min="1" value="' + esc(price) + '" placeholder="e.g. 3000"></div>';
       h += '<div class="field"><label>Quantity</label><div class="qty"><button data-qd="-1">−</button><b>' + qty + '</b><button data-qd="1">+</button></div></div>' +
-        '<div class="note small">Line: <b>' + (lt == null ? 'enter price' : money(lt)) + '</b> · est. cost ' + money(c) + (lt == null ? '' : ' · est. profit ' + pm(lt - c)) + ' <span class="tag ex">example costs</span></div>' +
+        '<div class="note small">Line: <b>' + (lt == null ? 'enter price' : money(lt)) + '</b> · est. cost ' + money(c) + (lt == null ? '' : ' · est. profit ' + pm(lt - c)) + ' <span class="tag est">estimated cost</span></div>' +
         '<div class="acts"><button class="btn" data-close>Cancel</button><button class="btn primary" id="addIt">Add to ticket</button></div>';
       openSheet(h);
-      const mp = $('mp'); if (mp) mp.oninput = () => { price = mp.value; const s = summary(it, ch), u = +price || null; const n = document.querySelector('#sheetPanel .note'); if (n) n.innerHTML = 'Line: <b>' + (u ? money(u * qty) : 'enter price') + '</b> · est. cost ' + money(lineCost(it.id, s, qty).cost) + (u ? ' · est. profit ' + pm(u * qty - lineCost(it.id, s, qty).cost) : '') + ' <span class="tag ex">example costs</span>'; };
+      const mp = $('mp'); if (mp) mp.oninput = () => { price = mp.value; const s = summary(it, ch), u = +price || null; const n = document.querySelector('#sheetPanel .note'); if (n) n.innerHTML = 'Line: <b>' + (u ? money(u * qty) : 'enter price') + '</b> · est. cost ' + money(lineCost(it.id, s, qty).cost) + (u ? ' · est. profit ' + pm(u * qty - lineCost(it.id, s, qty).cost) : '') + ' <span class="tag est">estimated cost</span>'; };
       $('sheetPanel').onclick = (e) => {
         const b = e.target.closest('button'); if (!b) return;
         if (b.dataset.g) { ch[+b.dataset.g] = +b.dataset.k; draw(); }
@@ -264,7 +271,8 @@
       const v = i.vendor;
       return '<div class="card si ' + (i.low ? 'low' : '') + '"><div class="sh"><b>' + esc(i.name) + '</b>' + (i.low ? '<span class="tag new">LOW</span>' : '<span class="tag ready">OK</span>') + '</div>' +
         '<div class="sh"><span class="lvl">' + i.stock + ' <span class="small muted">' + esc(i.unit) + '</span></span><span class="small muted">≈ ' + i.servingsLeft + ' servings</span></div><div class="bar"><i style="width:' + pctv + '%"></i></div>' +
-        '<div class="small muted">Minimum: ' + (i.min.kind === 'servings' ? 'enough for ' + i.min.value + ' servings (' + i.threshold + ' ' + esc(i.unit) + ')' : i.min.value + ' ' + esc(i.unit)) + ' · cost ' + money(i.costPerUnit) + '/' + esc(i.unit) + (i.costExample ? ' <span class="tag ex">example</span>' : '') + '</div>' +
+        '<div class="small muted">Minimum: ' + (i.min.kind === 'servings' ? 'enough for ' + i.min.value + ' servings (' + i.threshold + ' ' + esc(i.unit) + ')' : i.min.value + ' ' + esc(i.unit)) + ' · cost ' + money(i.costPerUnit) + '/' + esc(i.unit) + ' ' + costTag(i) + '</div>' +
+        (i.costSource && (i.costSource.url || i.costSource.note) ? '<div class="small muted src">' + (i.costSource.url ? '<a href="' + esc(i.costSource.url) + '" target="_blank" rel="noopener">' + esc(i.costSource.name || 'source') + '</a>' : '') + (i.costSource.pack ? ' · ' + esc(i.costSource.pack) + ' ' + esc(i.costSource.price || '') : '') + (i.costSource.date ? ' · seen ' + esc(i.costSource.date) : '') + (i.costSource.note ? '<br>' + esc(i.costSource.note) : '') + '</div>' : '') +
         '<div class="vend">' + (v ? '🚚 ' + esc(v.name) + (v.placeholder ? ' <span class="tag ph">placeholder</span>' : '') + ' · <a href="tel:' + esc(v.phone.replace(/[^\d+]/g, '')) + '">📞 ' + esc(v.phone) + '</a>' + (i.low ? ' <b class="neg">· call this vendor</b>' : '') : '<span class="muted">No vendor set</span>') + '</div>' +
         '<div class="acts"><button class="btn sm" data-stk="add" data-id="' + i.id + '">+ Restock</button><button class="btn sm" data-stk="set" data-id="' + i.id + '">Count / set</button></div></div>';
     }).join('') + '</div>';
@@ -281,7 +289,7 @@
   // ---------- TODAY ----------
   function renderToday() {
     const s = D.summary;
-    let h = '<h2>Today · ' + esc(s.day) + '</h2>' + exampleNote() + '<div class="kpis"><div class="kpi"><b>' + money(s.sales) + '</b><span>Sales (' + s.orders + ' orders)</span></div><div class="kpi"><b>' + money(s.cost) + '</b><span>Est. cost (example)</span></div><div class="kpi"><b>' + pm(s.profit) + '</b><span>Est. profit · ' + pct(s.profit, s.sales) + '</span></div><div class="kpi"><b>' + (s.orders ? money(s.sales / s.orders) : '–') + '</b><span>Average order</span></div></div>';
+    let h = '<h2>Today · ' + esc(s.day) + '</h2>' + exampleNote() + '<div class="kpis"><div class="kpi"><b>' + money(s.sales) + '</b><span>Sales (' + s.orders + ' orders)</span></div><div class="kpi"><b>' + money(s.cost) + '</b><span>Est. cost (estimates)</span></div><div class="kpi"><b>' + pm(s.profit) + '</b><span>Est. profit · ' + pct(s.profit, s.sales) + '</span></div><div class="kpi"><b>' + (s.orders ? money(s.sales / s.orders) : '–') + '</b><span>Average order</span></div></div>';
     if (s.tbc) h += '<div class="note">' + s.tbc + ' order(s) have a Hot Box / Wrap Box with price still to confirm (not counted in sales). Set the price on the order card.</div>';
     h += '<h3>By source</h3><div class="scroll"><table class="t"><tr><th>Source</th><th class="r">Orders</th><th class="r">Sales</th><th class="r">Cost</th><th class="r">Profit</th></tr>' +
       ['walk-in', 'whatsapp', 'web'].map(k => { const b = s.bySource[k] || { orders: 0, sales: 0, cost: 0, profit: 0 }; return '<tr><td><span class="tag ' + k + '">' + SRC[k] + '</span></td><td class="r">' + b.orders + '</td><td class="r">' + money(b.sales) + '</td><td class="r">' + money(b.cost) + '</td><td class="r">' + pm(b.profit) + '</td></tr>'; }).join('') +
@@ -294,31 +302,35 @@
   // ---------- SETTINGS ----------
   let SD = null;   // editable copy
   function renderSettings() {
-    SD = { vendors: JSON.parse(JSON.stringify(D.vendors)), ingredients: D.ingredients.map(i => ({ id: i.id, name: i.name, unit: i.unit, costPerUnit: i.costPerUnit, costExample: i.costExample, vendorId: i.vendorId, min: { ...i.min } })), recipes: JSON.parse(JSON.stringify(D.recipes)), settings: { readyText: D.settings.readyText, readyTextDelivery: D.settings.readyTextDelivery, lowStockWhatsApp: D.settings.lowStockWhatsApp } };
+    SD = { vendors: JSON.parse(JSON.stringify(D.vendors)), ingredients: D.ingredients.map(i => ({ id: i.id, name: i.name, unit: i.unit, costPerUnit: i.costPerUnit, costLabel: labelOf(i), costSource: i.costSource || null, vendorId: i.vendorId, min: { ...i.min } })), recipes: JSON.parse(JSON.stringify(D.recipes)), settings: { readyText: D.settings.readyText, readyTextDelivery: D.settings.readyTextDelivery, lowStockWhatsApp: D.settings.lowStockWhatsApp } };
     drawSettings();
   }
   function drawSettings() {
     const ingOpts = (sel) => SD.ingredients.map(i => '<option value="' + i.id + '"' + (i.id === sel ? ' selected' : '') + '>' + esc(i.name) + '</option>').join('');
-    let h = '<h2>Settings</h2><div class="note">🧪 <b>' + esc(D.settings.examplesNote || 'Example numbers, Calton to supply.') + '</b> Everything marked <span class="tag ex">example</span> or <span class="tag ph">placeholder</span> is invented for the demo: replace it with real costs, portions and vendor details, then untick "example".</div>';
+    let h = '<h2>Settings</h2><div class="note">🧪 <b>' + esc(D.settings.examplesNote || 'Example numbers, Calton to supply.') + '</b> Everything marked <span class="tag ex">example</span> is made up, <span class="tag est">market estimate</span> is a public Guyana shop price (not what Unruly Taste pays) and <span class="tag ph">placeholder</span> vendors are not real. When the owner confirms a number, set its label to <span class="tag real">real (owner)</span>, or use Bulk import below.</div>';
     h += '<h3>Ready messages</h3><div class="card">' + (D.settings.readyTestMode ? '<div class="note blue">🧪 <b>TEST MODE is ON</b> (set on the shop PC, not here). Ready messages go to the own test chat ' + esc(D.settings.ownChat) + ', labelled TEST. Going live needs Calton\'s OK. When live, customers get the WhatsApp line\'s fixed safe wording (same as the default below), only on confirmed numbers.</div>' : '<div class="note red"><b>LIVE:</b> ready messages go to customers with a confirmed WhatsApp number.</div>') +
       '<div class="field"><label>Pickup message ({name} {no} {total})</label><textarea data-s="readyText" rows="3">' + esc(SD.settings.readyText) + '</textarea></div>' +
       '<div class="field"><label>Delivery message</label><textarea data-s="readyTextDelivery" rows="3">' + esc(SD.settings.readyTextDelivery) + '</textarea></div>' +
       '<label class="small"><input type="checkbox" data-s="lowStockWhatsApp"' + (SD.settings.lowStockWhatsApp ? ' checked' : '') + '> Send low-stock WhatsApp alerts to the shop\'s own chat</label></div>';
-    h += '<h3>Ingredients &amp; costs</h3><div class="scroll"><table class="t"><tr><th>Name</th><th>Unit</th><th>Cost / unit (G$)</th><th>Example?</th><th>Low-stock minimum</th><th>Vendor</th></tr>' + SD.ingredients.map((i, k) =>
+    h += '<h3>Ingredients &amp; costs</h3><div class="scroll"><table class="t"><tr><th>Name</th><th>Unit</th><th>Cost / unit (G$)</th><th>Label</th><th>Source</th><th>Low-stock minimum</th><th>Vendor</th></tr>' + SD.ingredients.map((i, k) =>
       '<tr><td><input data-i="' + k + '" data-f="name" value="' + esc(i.name) + '"></td><td><input data-i="' + k + '" data-f="unit" value="' + esc(i.unit) + '" style="min-width:55px"></td><td><input type="number" step="0.01" data-i="' + k + '" data-f="costPerUnit" value="' + i.costPerUnit + '"></td>' +
-      '<td><input type="checkbox" data-i="' + k + '" data-f="costExample"' + (i.costExample ? ' checked' : '') + '></td>' +
+      '<td><select data-i="' + k + '" data-f="costLabel" style="width:auto">' + Object.keys(LBL).map(l => '<option value="' + l + '"' + (i.costLabel === l ? ' selected' : '') + '>' + LBL[l][1] + '</option>').join('') + '</select></td>' +
+      '<td class="small" style="min-width:160px">' + (i.costSource && i.costSource.url ? '<a href="' + esc(i.costSource.url) + '" target="_blank" rel="noopener" title="' + esc(srcText(i.costSource)) + '">' + esc(i.costSource.name || 'source') + '</a><br>' + esc((i.costSource.pack || '') + ' ' + (i.costSource.price || '')) + (i.costSource.date ? ' · ' + esc(i.costSource.date) : '') : '<span class="muted">' + esc(i.costSource && i.costSource.note ? i.costSource.note : '–') + '</span>') + '</td>' +
       '<td style="white-space:nowrap"><select data-i="' + k + '" data-f="minKind" style="width:auto"><option value="qty"' + (i.min.kind === 'qty' ? ' selected' : '') + '>quantity</option><option value="servings"' + (i.min.kind === 'servings' ? ' selected' : '') + '>servings</option></select> <input type="number" step="0.01" data-i="' + k + '" data-f="minValue" value="' + i.min.value + '" style="width:80px;min-width:60px"></td>' +
       '<td><select data-i="' + k + '" data-f="vendorId"><option value="">–</option>' + SD.vendors.map(v => '<option value="' + esc(v.id) + '"' + (v.id === i.vendorId ? ' selected' : '') + '>' + esc(v.name) + '</option>').join('') + '</select></td></tr>').join('') + '</table></div>';
     h += '<h3>Vendors</h3><p class="muted small">Names/phones are only shown to staff and in the low-stock alert. The POS never contacts vendors.</p><div class="scroll"><table class="t"><tr><th>Name</th><th>Phone</th><th>Placeholder?</th></tr>' + SD.vendors.map((v, k) =>
       '<tr><td><input data-v="' + k + '" data-f="name" value="' + esc(v.name) + '"></td><td><input data-v="' + k + '" data-f="phone" value="' + esc(v.phone) + '"></td><td><input type="checkbox" data-v="' + k + '" data-f="placeholder"' + (v.placeholder ? ' checked' : '') + '></td></tr>').join('') + '</table></div><button class="btn sm" id="addV" style="margin-top:6px">+ Add vendor</button>';
     h += '<h3>Recipes (per serving)</h3><p class="muted small">"Only if choice contains" applies a line when the order\'s choices mention that word (e.g. Wings / Strip chicken / Fries), once per mention.</p>';
     for (const it of M.items) {
-      const rec = SD.recipes[it.id] || (SD.recipes[it.id] = { example: true, rules: [] });
+      const rec = SD.recipes[it.id] || (SD.recipes[it.id] = { label: 'example', rules: [] }); if (!LBL[rec.label]) rec.label = rec.example === false ? 'real' : 'example';
       const c = lineCost2(it, rec);
-      h += '<details class="rec"><summary>' + esc(it.name) + ' · est. cost ' + money(c) + (it.price ? ' · price ' + money(it.price) + ' · margin ' + pct(it.price - c, it.price) : ' · price to confirm') + (rec.example ? ' <span class="tag ex">example</span>' : '') + '</summary><div class="rb"><div class="scroll"><table class="t"><tr><th>Ingredient</th><th>Qty / serving</th><th>Only if choice contains</th><th></th></tr>' +
+      h += '<details class="rec"><summary>' + esc(it.name) + ' · est. cost ' + money(c) + (it.price ? ' · price ' + money(it.price) + ' · margin ' + pct(it.price - c, it.price) : ' · price to confirm') + ' ' + recTag(rec) + '</summary><div class="rb">' + (rec.note ? '<p class="small muted">' + esc(rec.note) + '</p>' : '') + '<div class="scroll"><table class="t"><tr><th>Ingredient</th><th>Qty / serving</th><th>Only if choice contains</th><th></th></tr>' +
         rec.rules.map((r, k) => '<tr><td><select data-r="' + it.id + '" data-k="' + k + '" data-f="ing">' + ingOpts(r.ing) + '</select></td><td><input type="number" step="0.001" data-r="' + it.id + '" data-k="' + k + '" data-f="qty" value="' + r.qty + '"></td><td><input data-r="' + it.id + '" data-k="' + k + '" data-f="match" value="' + esc(r.match || '') + '" placeholder="(always)"></td><td><button class="btn sm" data-rr="' + it.id + '" data-k="' + k + '">✕</button></td></tr>').join('') +
-        '</table></div><div class="acts"><button class="btn sm" data-ra="' + it.id + '">+ Ingredient</button><label class="small"><input type="checkbox" data-re="' + it.id + '"' + (rec.example ? ' checked' : '') + '> example (Calton to supply)</label></div></div></details>';
+        '</table></div><div class="acts"><button class="btn sm" data-ra="' + it.id + '">+ Ingredient</button><label class="small">Portions: <select data-re="' + it.id + '" style="width:auto">' + Object.keys(LBL).map(l => '<option value="' + l + '"' + (rec.label === l ? ' selected' : '') + '>' + (l === 'estimate' ? 'estimate' : LBL[l][1]) + '</option>').join('') + '</select></label></div></div></details>';
     }
+    h += '<h3>Bulk import (owner sheet answers)</h3><div class="card small"><p>Paste the owner\'s answers as CSV (or choose a .csv file), check the preview, then apply. Imported numbers are labelled <span class="tag real">real (owner)</span>. Blank cells mean "no change". <a href="data/owner-sheet-template.csv" download>Download the CSV template</a>.</p>' +
+      '<pre class="fmt">ingredient, name, unit, cost per unit (G$), supplier name, supplier phone, current stock, minimum, minimum type (qty|servings)\nrecipe, menu item, ingredient name, qty per serving, only if choice contains (optional)\nprice, Hot Box | Wrap Box, price (G$)</pre>' +
+      '<textarea id="impText" rows="6" placeholder="ingredient,Chicken wings,kg,1400,ABC Poultry,+592 ...,20,5,qty"></textarea><div class="acts"><input type="file" id="impFile" accept=".csv,text/csv,text/plain"><button class="btn sm" id="impPrev">Preview import</button></div><div id="impOut"></div></div>';
     h += '<div class="acts savebar"><button class="btn" id="resetS">Discard changes</button><button class="btn red" id="saveS">Save settings</button></div>' +
       '<h3>This device</h3><div class="card small">Signed in as staff. <button class="btn sm" id="signOut">Sign out</button></div>';
     const open = [...document.querySelectorAll('#tab-settings details[open] summary')].map(s => s.textContent.split(' · ')[0]);
@@ -330,10 +342,10 @@
     const t = e.target, d = t.dataset; dirtySettings = true;
     const val = t.type === 'checkbox' ? t.checked : t.value;
     if (d.s) SD.settings[d.s] = val;
-    else if (d.i) { const i = SD.ingredients[+d.i]; if (d.f === 'minKind') i.min.kind = val; else if (d.f === 'minValue') i.min.value = +val; else if (d.f === 'costPerUnit') i.costPerUnit = +val; else i[d.f] = val; }
+    else if (d.i) { const i = SD.ingredients[+d.i]; if (d.f === 'costLabel') { i.costLabel = val; if (val === 'real') i.costSource = { name: 'Owner-confirmed', date: today(), note: 'Set in POS Settings' }; } else if (d.f === 'minKind') i.min.kind = val; else if (d.f === 'minValue') i.min.value = +val; else if (d.f === 'costPerUnit') i.costPerUnit = +val; else i[d.f] = val; }
     else if (d.v) SD.vendors[+d.v][d.f] = val;
     else if (d.r) { const r = SD.recipes[d.r].rules[+d.k]; r[d.f] = d.f === 'qty' ? +val : val; if (d.f === 'match' && !val) delete r.match; }
-    else if (d.re) SD.recipes[d.re].example = val;
+    else if (d.re) { SD.recipes[d.re].label = val; SD.recipes[d.re].example = val === 'example'; }
   });
   $('tab-settings').addEventListener('change', (e) => { if (e.target.dataset.r || e.target.dataset.f === 'costPerUnit') drawSettings(); });
   $('tab-settings').addEventListener('click', async (e) => {
@@ -344,6 +356,88 @@
     if (b.id === 'resetS') { dirtySettings = false; return renderSettings(); }
     if (b.id === 'signOut') { localStorage.removeItem(TOKEN_KEY); return location.reload(); }
     if (b.id === 'saveS') { b.disabled = true; const j = await act('settings', SD, 'Settings saved'); b.disabled = false; if (j) { dirtySettings = false; renderSettings(); } }
+  });
+
+  // ---------- bulk import (owner sheet CSV) ----------
+  let IMP = null;
+  function parseCSV(t) {
+    const rows = []; let row = [], cur = '', q = false;
+    for (let i = 0; i < t.length; i++) { const c = t[i];
+      if (q) { if (c === '"') { if (t[i + 1] === '"') { cur += '"'; i++; } else q = false; } else cur += c; }
+      else if (c === '"') q = true; else if (c === ',' || c === '\t') { row.push(cur.trim()); cur = ''; }
+      else if (c === '\n' || c === '\r') { if (c === '\r' && t[i + 1] === '\n') i++; row.push(cur.trim()); rows.push(row); row = []; cur = ''; }
+      else cur += c; }
+    if (cur || row.length) { row.push(cur.trim()); rows.push(row); }
+    return rows.filter(r => r.some(x => x));
+  }
+  const numOf = (v) => { const s = String(v || '').replace(/G\$|\$|,|\s/gi, ''); if (s === '') return null; const n = Number(s); return Number.isFinite(n) && n >= 0 ? n : NaN; };
+  const slug = (s) => String(s).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 24) || 'item';
+  const findItem = (v) => { const k = String(v || '').trim().toLowerCase(); return M.items.find(i => i.id === k || i.name.toLowerCase() === k) || (k.length > 3 ? M.items.find(i => i.name.toLowerCase().startsWith(k)) : null); };
+  function buildImport(text) {
+    const res = { ings: [], recs: {}, prices: [], warn: [], err: [] };
+    parseCSV(text).forEach((r, n) => {
+      const t = (r[0] || '').toLowerCase(), L = 'Line ' + (n + 1) + ': ';
+      if (t === 'type' || t.startsWith('#') || t === 'section') return;
+      if (t === 'ingredient') {
+        if (!r[1]) return res.err.push(L + 'ingredient name missing');
+        const x = { name: r[1], unit: r[2] || '', cost: numOf(r[3]), supplier: r[4] || '', phone: r[5] || '', stock: numOf(r[6]), min: numOf(r[7]), minType: /^serv/i.test(r[8] || '') ? 'servings' : 'qty' };
+        for (const k of ['cost', 'stock', 'min']) if (Number.isNaN(x[k])) { res.err.push(L + k + ' is not a number'); x[k] = null; }
+        res.ings.push(x);
+      } else if (t === 'recipe') {
+        const it = findItem(r[1]); if (!it) return res.err.push(L + 'menu item "' + r[1] + '" not found');
+        const q = numOf(r[3]); if (q != null && (Number.isNaN(q) || q <= 0)) return res.err.push(L + 'qty must be a number > 0');
+        if (!r[2]) return res.err.push(L + 'ingredient name missing');
+        (res.recs[it.id] = res.recs[it.id] || []).push({ ingName: r[2], qty: q, match: r[4] || '' });   // q null = keep current amount
+      } else if (t === 'price') { const p = numOf(r[2]); if (p) res.prices.push([r[1], p]); }
+      else res.err.push(L + 'first column must be ingredient, recipe or price');
+    });
+    for (const id of Object.keys(res.recs)) if (!res.recs[id].some(r => r.qty != null)) delete res.recs[id];   // nothing filled in: leave the recipe alone
+    return res;
+  }
+  function applyImport(res) {   // into the editable Settings copy (SD); returns [id, stock] pairs to set afterwards
+    const stocks = [], byName = (n) => { const k = String(n).trim().toLowerCase(); return SD.ingredients.find(i => i.id === k || i.name.toLowerCase() === k); };
+    const src = { name: 'Owner ingredient sheet', date: today(), note: 'Imported in POS Settings' };
+    const newIng = (name, unit) => { let id = slug(name); while (SD.ingredients.some(j => j.id === id)) id += '-2'; const i = { id, name, unit: unit || 'each', costPerUnit: 0, costLabel: 'example', costSource: null, vendorId: '', min: { kind: 'qty', value: 0 } }; SD.ingredients.push(i); return i; };
+    for (const x of res.ings) {
+      const i = byName(x.name) || newIng(x.name, x.unit);
+      if (x.unit) i.unit = x.unit;
+      if (x.cost != null) { i.costPerUnit = x.cost; i.costLabel = 'real'; i.costSource = src; }
+      if (x.supplier) { let v = SD.vendors.find(v => v.name.toLowerCase() === x.supplier.toLowerCase()); if (!v) { let vid = 'v-' + slug(x.supplier); while (SD.vendors.some(w => w.id === vid)) vid += '-2'; v = { id: vid, name: x.supplier, phone: '', placeholder: false }; SD.vendors.push(v); } if (x.phone) v.phone = x.phone; v.placeholder = false; i.vendorId = v.id; }
+      if (x.min != null) i.min = { kind: x.minType, value: x.min };
+      if (x.stock != null) stocks.push([i.id, x.stock]);
+    }
+    for (const [id, rows] of Object.entries(res.recs)) {
+      const rules = [];
+      const old = (SD.recipes[id] && SD.recipes[id].rules) || [];
+      for (const r of rows) { if (r.qty == null) { const i0 = byName(r.ingName), o = i0 && old.find(x => x.ing === i0.id && (x.match || '') === r.match); if (o) rules.push({ ...o }); continue; }
+        let i = byName(r.ingName); if (!i) { res.warn.push('"' + r.ingName + '" (in ' + byId(id).name + ') was not in the ingredient list: added with cost 0, label example'); i = newIng(r.ingName); }
+        rules.push({ ing: i.id, qty: r.qty, ...(r.match ? { match: r.match } : {}) }); }
+      const all = rows.every(r => r.qty != null), prev = SD.recipes[id] || {};
+      SD.recipes[id] = { label: all ? 'real' : (prev.label === 'example' ? 'example' : 'estimate'), example: false, note: (all ? 'From' : 'Partly from') + ' the owner ingredient sheet (' + today() + ')' + (all ? '' : '; blank amounts kept as before'), rules };
+    }
+    return stocks;
+  }
+  $('tab-settings').addEventListener('change', (e) => { if (e.target.id === 'impFile' && e.target.files[0]) { const f = e.target.files[0]; if (f.size > 200000) return toast('File too big'); f.text().then(t => { $('impText').value = t; toast('File loaded, tap Preview'); }); } });
+  $('tab-settings').addEventListener('click', async (e) => {
+    const b = e.target.closest('button'); if (!b) return;
+    if (b.id === 'impPrev') {
+      IMP = buildImport($('impText').value || '');
+      const n = Object.keys(IMP.recs);
+      $('impOut').innerHTML = '<div class="note blue">' + IMP.ings.length + ' ingredient row(s) · recipes for ' + n.length + ' item(s)' + (n.length ? ' (' + n.map(id => esc(byId(id).name)).join(', ') + ': these replace the current recipe; blank amounts keep the current amount)' : '') + '<br>' +
+        IMP.ings.map(x => esc(x.name) + ': ' + (x.cost != null ? money(x.cost) + '/' + esc(x.unit || '?') : 'cost unchanged') + (x.supplier ? ' · ' + esc(x.supplier) : '') + (x.stock != null ? ' · stock ' + x.stock : '') + (x.min != null ? ' · min ' + x.min + ' ' + x.minType : '')).join('<br>') +
+        (IMP.prices.length ? '<br><b>Menu prices</b> (not changed here; they live on the website menu): ' + IMP.prices.map(p => esc(p[0]) + ' ' + money(p[1])).join(', ') : '') + '</div>' +
+        (IMP.err.length ? '<div class="note red">' + IMP.err.map(esc).join('<br>') + '</div>' : '') +
+        (IMP.err.length || (!IMP.ings.length && !n.length) ? '' : '<button class="btn red" id="impApply">Apply import &amp; save</button>');
+      dirtySettings = true;
+    }
+    if (b.id === 'impApply' && IMP) {
+      b.disabled = true; const stocks = applyImport(IMP);
+      busy = true;
+      try { await api('settings', SD); for (const [id, q] of stocks) await api('stock', { id, op: 'set', qty: q });
+        toast('✅ Imported' + (IMP.warn.length ? ' (' + IMP.warn.length + ' note(s))' : ''), 5000); if (IMP.warn.length) alert(IMP.warn.join('\n'));
+        IMP = null; dirtySettings = false; busy = false; await sync(true); renderSettings(); }
+      catch (err) { toast('⚠️ ' + err.message, 6000); b.disabled = false; } finally { busy = false; }
+    }
   });
 
   // ---------- boot ----------

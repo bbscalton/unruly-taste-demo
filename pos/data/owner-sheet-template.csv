@@ -1,0 +1,124 @@
+# Unruly Taste POS: owner sheet answers. Fill the blanks, keep the first column. Blank = keep the current value. Numbers only (no G$).
+# ingredient,name,unit,cost per unit (G$),supplier name,supplier phone,current stock,minimum,minimum type (qty|servings)
+ingredient,Chicken wings,kg,,,,,,qty
+ingredient,Chicken strips (boneless),kg,,,,,,qty
+ingredient,Chicken burger patty,each,,,,,,qty
+ingredient,Flour / breading mix,kg,,,,,,qty
+ingredient,Cooking oil,L,,,,,,qty
+ingredient,"Fries (frozen, straight-cut)",kg,,,,,,qty
+ingredient,Macaroni,kg,,,,,,qty
+ingredient,Cheese,kg,,,,,,qty
+ingredient,Waffle mix,kg,,,,,,qty
+ingredient,Plantain,each,,,,,,qty
+ingredient,Burger bun,each,,,,,,qty
+ingredient,Tortilla wrap,each,,,,,,qty
+ingredient,Wing sauce (all flavours),L,,,,,,qty
+ingredient,Dipping sauce,L,,,,,,qty
+ingredient,Refresher drink,each,,,,,,qty
+ingredient,Takeout box (small),each,,,,,,qty
+ingredient,Takeout box (large),each,,,,,,qty
+# recipe,menu item,ingredient name,qty per serving (in the ingredient's unit: kg / L / each),only if choice contains (optional)
+recipe,Wings (12pc),Chicken wings,,
+recipe,Wings (12pc),Flour / breading mix,,
+recipe,Wings (12pc),Cooking oil,,
+recipe,Wings (12pc),Wing sauce (all flavours),,
+recipe,Wings (12pc),Takeout box (small),,
+recipe,Wings + a Side,Chicken wings,,
+recipe,Wings + a Side,Flour / breading mix,,
+recipe,Wings + a Side,Cooking oil,,
+recipe,Wings + a Side,Wing sauce (all flavours),,
+recipe,Wings + a Side,"Fries (frozen, straight-cut)",,Fries
+recipe,Wings + a Side,Cooking oil,,Fries
+recipe,Wings + a Side,Macaroni,,Mac & Cheese
+recipe,Wings + a Side,Cheese,,Mac & Cheese
+recipe,Wings + a Side,Waffle mix,,Waffles
+recipe,Wings + a Side,Plantain,,Plantain
+recipe,Wings + a Side,Takeout box (large),,
+recipe,Wings Combo,Chicken wings,,
+recipe,Wings Combo,Flour / breading mix,,
+recipe,Wings Combo,Cooking oil,,
+recipe,Wings Combo,Wing sauce (all flavours),,
+recipe,Wings Combo,"Fries (frozen, straight-cut)",,
+recipe,Wings Combo,Macaroni,,
+recipe,Wings Combo,Cheese,,
+recipe,Wings Combo,Takeout box (large),,
+recipe,Burger & Wings Combo,Chicken wings,,
+recipe,Burger & Wings Combo,Flour / breading mix,,
+recipe,Burger & Wings Combo,Cooking oil,,
+recipe,Burger & Wings Combo,Wing sauce (all flavours),,
+recipe,Burger & Wings Combo,Burger bun,,
+recipe,Burger & Wings Combo,Chicken burger patty,,
+recipe,Burger & Wings Combo,"Fries (frozen, straight-cut)",,
+recipe,Burger & Wings Combo,Dipping sauce,,
+recipe,Burger & Wings Combo,Takeout box (large),,
+recipe,Hot Box,Burger bun,,
+recipe,Hot Box,Chicken burger patty,,
+recipe,Hot Box,Flour / breading mix,,
+recipe,Hot Box,Cooking oil,,
+recipe,Hot Box,"Fries (frozen, straight-cut)",,
+recipe,Hot Box,Macaroni,,
+recipe,Hot Box,Cheese,,
+recipe,Hot Box,Chicken wings,,Wings
+recipe,Hot Box,Flour / breading mix,,Wings
+recipe,Hot Box,Cooking oil,,Wings
+recipe,Hot Box,Wing sauce (all flavours),,Wings
+recipe,Hot Box,Chicken strips (boneless),,Strip chicken
+recipe,Hot Box,Flour / breading mix,,Strip chicken
+recipe,Hot Box,Cooking oil,,Strip chicken
+recipe,Hot Box,Takeout box (large),,
+recipe,Wrap Box,Tortilla wrap,,
+recipe,Wrap Box,Chicken strips (boneless),,
+recipe,Wrap Box,Flour / breading mix,,
+recipe,Wrap Box,Cooking oil,,
+recipe,Wrap Box,"Fries (frozen, straight-cut)",,
+recipe,Wrap Box,Macaroni,,
+recipe,Wrap Box,Cheese,,
+recipe,Wrap Box,Chicken wings,,Wings
+recipe,Wrap Box,Flour / breading mix,,Wings
+recipe,Wrap Box,Cooking oil,,Wings
+recipe,Wrap Box,Wing sauce (all flavours),,Wings
+recipe,Wrap Box,Chicken strips (boneless),,Strip chicken
+recipe,Wrap Box,Flour / breading mix,,Strip chicken
+recipe,Wrap Box,Cooking oil,,Strip chicken
+recipe,Wrap Box,Takeout box (large),,
+recipe,Thursday Double Bubble,Burger bun,,Hot Box
+recipe,Thursday Double Bubble,Chicken burger patty,,Hot Box
+recipe,Thursday Double Bubble,Flour / breading mix,,Hot Box
+recipe,Thursday Double Bubble,Cooking oil,,Hot Box
+recipe,Thursday Double Bubble,Tortilla wrap,,Wrap Box
+recipe,Thursday Double Bubble,Chicken strips (boneless),,Wrap Box
+recipe,Thursday Double Bubble,Flour / breading mix,,Wrap Box
+recipe,Thursday Double Bubble,Cooking oil,,Wrap Box
+recipe,Thursday Double Bubble,"Fries (frozen, straight-cut)",,
+recipe,Thursday Double Bubble,Cooking oil,,
+recipe,Thursday Double Bubble,Macaroni,,
+recipe,Thursday Double Bubble,Cheese,,
+recipe,Thursday Double Bubble,Chicken wings,,Wings
+recipe,Thursday Double Bubble,Flour / breading mix,,Wings
+recipe,Thursday Double Bubble,Cooking oil,,Wings
+recipe,Thursday Double Bubble,Wing sauce (all flavours),,Wings
+recipe,Thursday Double Bubble,Chicken strips (boneless),,Strip chicken
+recipe,Thursday Double Bubble,Flour / breading mix,,Strip chicken
+recipe,Thursday Double Bubble,Cooking oil,,Strip chicken
+recipe,Thursday Double Bubble,Takeout box (large),,
+recipe,Friday Mega Meal,Burger bun,,
+recipe,Friday Mega Meal,Chicken burger patty,,
+recipe,Friday Mega Meal,Flour / breading mix,,
+recipe,Friday Mega Meal,Cooking oil,,
+recipe,Friday Mega Meal,Tortilla wrap,,
+recipe,Friday Mega Meal,Chicken strips (boneless),,
+recipe,Friday Mega Meal,"Fries (frozen, straight-cut)",,
+recipe,Friday Mega Meal,Macaroni,,
+recipe,Friday Mega Meal,Cheese,,
+recipe,Friday Mega Meal,Chicken wings,,Wings
+recipe,Friday Mega Meal,Flour / breading mix,,Wings
+recipe,Friday Mega Meal,Cooking oil,,Wings
+recipe,Friday Mega Meal,Wing sauce (all flavours),,Wings
+recipe,Friday Mega Meal,Chicken strips (boneless),,Strip chicken
+recipe,Friday Mega Meal,Flour / breading mix,,Strip chicken
+recipe,Friday Mega Meal,Cooking oil,,Strip chicken
+recipe,Friday Mega Meal,Refresher drink,,
+recipe,Friday Mega Meal,Takeout box (large),,
+# price,item,price (G$)  (menu prices are changed on the website; listed here for Calton)
+price,Hot Box,
+price,Wrap Box,

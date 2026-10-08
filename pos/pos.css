@@ -83,3 +83,7 @@ details.rec { background:#fff; border:1px solid var(--line); border-radius:12px;
 .toast { pointer-events:none; position:fixed; left:50%; bottom:86px; transform:translateX(-50%); background:var(--black); color:#fff; padding:10px 16px; border-radius:22px; font-size:.88rem; z-index:90; max-width:92%; box-shadow:0 6px 20px #0004; } @media (min-width:900px) { .toast { bottom:24px; } }
 
 .savebar { position:sticky; bottom:calc(62px + env(safe-area-inset-bottom)); background:var(--bg); padding:8px 0; box-shadow:0 -6px 12px -8px #0003; z-index:5; } @media (min-width:900px) { .savebar { bottom:0; } }
+.tag.est { background:#e0f2fe; color:#075985; border:1px dashed #38bdf8; text-transform:none; font-weight:700; } .tag.real { background:#dcfce7; color:#166534; border:1px solid #22c55e; text-transform:none; font-weight:700; }
+.src { margin-top:3px; line-height:1.35; } .src a { color:var(--blue); }
+pre.fmt { white-space:pre-wrap; background:#faf7f3; border:1px solid var(--line); border-radius:8px; padding:8px; font-size:.74rem; }
+#impText { width:100%; font-size:14px; padding:8px; border:1px solid #cfc7bf; border-radius:10px; font-family:ui-monospace,Menlo,monospace; }
