@@ -7,7 +7,7 @@ placeholders have been removed. The top DEMO banner on the page stays (sample me
 Source originals live outside the repo (`/workspace/fastfood/unruly-taste-facebook-photos/` on the
 build box). Every card photo here is cropped to 4:3 and resized to 800x600 WebP (each < 150 KB).
 
-**Phone number rule:** the number 647-3213 that appears on some of the business's graphics is NOT
+**Phone number rule:** the business phone number that appears on some of the business's graphics is NOT
 approved for live use. It has been cropped out of every image here (the two promo flyers lose their
 bottom contact strip; the combo photos lose the small logo/contact card in the corner). Keep it that
 way when adding new images.
