@@ -169,3 +169,6 @@ html.faq-open, html.faq-open body { overflow:hidden; }
   body.printing #printArea { display:block !important; }
   body.printing .rc { box-shadow:none; padding:0 0 4mm; margin:0 auto; }
 }
+
+/* Promos */
+.promo-preview { white-space: pre-wrap; background: #111; color: #fff; border-radius: 10px; padding: 12px; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: .82rem; line-height: 1.45; max-height: 280px; overflow: auto; }

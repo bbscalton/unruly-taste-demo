@@ -62,6 +62,12 @@
       ['An order, total or stock number looks wrong.', '<p>Don\'t re-enter sales to "fix" it. Write down the order number and time, take a screenshot, and tell Calton. Stock can be corrected with <b>Count / set</b>.</p>'],
       ['Who do I contact for help?', '<p><b>Calton (Neuereatec)</b>, through your usual staff contact. Please don\'t post the POS link or PIN anywhere public.</p>'],
     ]],
+    ['Promos', [
+      ['How do promos work?', '<p>The <b>📣 Promos</b> tab lists customers who ordered with a WhatsApp number (a call\'s caller ID, web chat or web voice). Numbers are masked. A promo goes only to people marked <span class="tag ready">yes</span>. It does not go to <span class="tag ph">unknown</span>, <span class="tag collected">no</span> or <span class="tag collected">stopped</span>, and never to 592 712 2188 or this WhatsApp line.</p><p>Write the message, check the <b>preview</b> (that is the exact text, with an Unruly Taste header and "Reply STOP to stop" at the end), then <b>Send</b>. The confirm box shows how many people will get it. Messages go out slowly, one at a time, only while the WhatsApp line is idle, with a daily cap and at most one promo per customer per day. You can pause or cancel. <b>Send test to me</b> goes only to the shop\'s own chat, labelled TEST.</p>'],
+      ['How does someone opt in?', '<p>After an order, the assistant asks <b>once</b> whether they want Unruly Taste specials on WhatsApp. Only a clear <b>yes</b> opts them in, and the time and how they agreed (call, web chat or web voice) is saved. If they already answered, they are not asked again. Existing customers start as <b>unknown</b>, which is not opted in. Staff can set yes, no or stop on the customer row; that is recorded as set by staff.</p>'],
+      ['What does STOP do, and what are the limits?', '<p>Every promo ends with <b>Reply STOP to stop</b>. STOP or "unsubscribe" marks that customer stopped, and they are left out of future promos. The owner can also press <b>Stop</b> on their row. Limits: about 20 to 45 seconds between messages, 150 promos a day (changeable under Settings), and one promo per customer per day. A phone call pauses sending immediately.</p><p><b>Add sponsor line</b> is off unless you tick it. The line (default "Sponsored by Neuereatec", editable, with an owner default in Settings) is its own line just before STOP. On a picture promo it stays in the caption, still above STOP. You can edit it until the first message goes out.</p>'],
+    ]],
+
   ];
 
   let n = 0;

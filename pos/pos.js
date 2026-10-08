@@ -98,11 +98,13 @@
     $('lowCount').textContent = low; $('lowCount').classList.toggle('hidden', !low);
     $('bellCount').textContent = low; $('bellCount').classList.toggle('hidden', !low);
     const pq = D.printQueued || 0; $('pqCount').textContent = pq; $('pqCount').classList.toggle('hidden', !pq);
+    const pr = (D.promo && D.promo.promos || []).filter(p => p.status === 'running' || p.status === 'scheduled').length; if ($('promoCount')) { $('promoCount').textContent = pr; $('promoCount').classList.toggle('hidden', !pr); }
     processPrintQueue();
     if (tab === 'orders') renderOrders();
     else if (tab === 'walkin') renderWalkin();
     else if (tab === 'stock') renderStock();
     else if (tab === 'today') renderToday();
+    else if (tab === 'promo') renderPromo();
     else if (tab === 'settings' && (forceSettings || !dirtySettings)) renderSettings();
   }
   const exampleNote = () => { const n = { example: 0, estimate: 0, real: 0 }; D.ingredients.forEach(i => n[labelOf(i)]++);
@@ -330,6 +332,9 @@
       '<label class="small"><input type="checkbox" data-sr="showPhone"' + (SD.settings.receipt.showPhone ? ' checked' : '') + '> Business phone on receipt</label>' +
       '<div class="field"><label>Business phone (receipts only)</label><input data-sr="phone" value="' + esc(SD.settings.receipt.phone || '') + '" maxlength="20" placeholder="(not set)" style="max-width:220px"></div>' +
       '<label class="small"><input type="checkbox" id="printStation"' + (localStorage.getItem(PS_KEY) === '1' ? ' checked' : '') + '> This device is the print station (prints queued receipts automatically once a real printer driver is chosen)</label></div>';
+    h += '<h3>Promo sponsor line (owner)</h3><div class="card"><p class="muted small">Default sponsor line for new promos. Each promo stays off until "Add sponsor line" is ticked. Only the owner should change this.</p>' +
+      '<div class="field"><label>Default sponsor line</label><input data-spromo="sponsorDefault" maxlength="80" value="' + esc(SD.settings.promo.sponsorDefault) + '"></div>' +
+      '<div class="field"><label>Most promos per day</label><input data-spromo="dailyCap" type="number" min="10" max="500" value="' + esc(SD.settings.promo.dailyCap) + '" style="max-width:120px"></div></div>';
     h += '<h3>Ingredients &amp; costs</h3><div class="scroll"><table class="t"><tr><th>Name</th><th>Unit</th><th>Cost / unit (G$)</th><th>Label</th><th>Source</th><th>Low-stock minimum</th><th>Vendor</th></tr>' + SD.ingredients.map((i, k) =>
       '<tr><td><input data-i="' + k + '" data-f="name" value="' + esc(i.name) + '"></td><td><input data-i="' + k + '" data-f="unit" value="' + esc(i.unit) + '" style="min-width:55px"></td><td><input type="number" step="0.01" data-i="' + k + '" data-f="costPerUnit" value="' + i.costPerUnit + '"></td>' +
       '<td><select data-i="' + k + '" data-f="costLabel" style="width:auto">' + Object.keys(LBL).map(l => '<option value="' + l + '"' + (i.costLabel === l ? ' selected' : '') + '>' + LBL[l][1] + '</option>').join('') + '</select></td>' +
@@ -360,7 +365,8 @@
     const t = e.target, d = t.dataset; dirtySettings = true;
     const val = t.type === 'checkbox' ? t.checked : t.value;
     if (t.id === 'printStation') { localStorage.setItem(PS_KEY, t.checked ? '1' : '0'); dirtySettings = false; return toast(t.checked ? 'This device is the print station' : 'Print station off on this device'); }
-    if (d.sp) SD.settings.printer[d.sp] = d.sp === 'paperWidth' ? +val : val;
+    if (d.spromo) { SD.settings.promo[d.spromo] = d.spromo === 'dailyCap' ? +val : val; }
+    else if (d.sp) SD.settings.printer[d.sp] = d.sp === 'paperWidth' ? +val : val;
     else if (d.sr) SD.settings.receipt[d.sr] = val;
     else if (d.s) SD.settings[d.s] = val;
     else if (d.i) { const i = SD.ingredients[+d.i]; if (d.f === 'costLabel') { i.costLabel = val; if (val === 'real') i.costSource = { name: 'Owner-confirmed', date: today(), note: 'Set in POS Settings' }; } else if (d.f === 'minKind') i.min.kind = val; else if (d.f === 'minValue') i.min.value = +val; else if (d.f === 'costPerUnit') i.costPerUnit = +val; else i[d.f] = val; }
@@ -549,6 +555,83 @@
       }
     } catch (e) { toast('⚠️ Printer: ' + e.message); } finally { printing = false; }
   }
+
+  // ---------- PROMOS ----------
+  let promoView = 'customers', promoBody = '', promoSponsor = false, promoSponsorText = '', promoImage = false, promoWhen = '', promoPreview = null;
+  function renderPromo() {
+    const P = D.promo || { customers: [], optedIn: 0, promos: [], sentToday: 0, dailyCap: 150 };
+    const def = (D.settings.promo && D.settings.promo.sponsorDefault) || 'Sponsored by Neuereatec';
+    if (!promoSponsorText) promoSponsorText = def;
+    const chip = (id, label) => '<button class="chip ' + (promoView === id ? 'on' : '') + '" data-pv="' + id + '">' + label + '</button>';
+    let h = '<h2>Promos</h2><div class="chips">' + chip('customers', 'Customers (' + (P.customerCount || P.customers.length) + ')') + chip('compose', 'New promo') + chip('progress', 'Sending') + '</div>';
+    h += '<p class="muted small">Opted in: <b>' + (P.optedIn || 0) + '</b> · sent today ' + (P.sentToday || 0) + ' / ' + (P.dailyCap || 150) + '. Nobody is messaged unless they clearly said yes. 592 712 2188 and this line are never included. ' + (P.bridgePromo === false ? '<b>Customer sending is waiting for the WhatsApp bridge update.</b> Test-to-me still works.' : '') + '</p>';
+    if (promoView === 'customers') {
+      h += '<div class="scroll"><table class="t"><tr><th>Name</th><th>WhatsApp</th><th>Orders</th><th>First</th><th>Last</th><th>From</th><th>Specials</th><th></th></tr>' +
+        (P.customers || []).map(c => '<tr><td>' + esc(c.name || '–') + '</td><td>' + esc(c.number) + '</td><td>' + c.orders + '</td><td class="small">' + esc((c.firstAt || '').slice(0, 10)) + '</td><td class="small">' + esc((c.lastAt || '').slice(0, 10)) + '</td><td class="small">' + esc((c.sources || []).join(', ')) + '</td><td><span class="tag ' + (c.opt === 'yes' ? 'ready' : c.opt === 'stopped' ? 'collected' : 'ph') + '">' + esc(c.opt) + '</span>' + (c.optHow ? '<div class="muted small">' + esc(c.optHow) + (c.optAt ? ' · ' + esc(c.optAt.slice(0, 16).replace('T', ' ')) : '') + '</div>' : '') + '</td><td style="white-space:nowrap"><button class="btn sm" data-copt="yes" data-cid="' + esc(c.id) + '">Yes</button> <button class="btn sm" data-copt="no" data-cid="' + esc(c.id) + '">No</button> <button class="btn sm" data-copt="stopped" data-cid="' + esc(c.id) + '">Stop</button></td></tr>').join('') +
+        '</table></div>' + (!(P.customers || []).length ? '<div class="empty card">No customers with a WhatsApp number yet. Orders from calls and the website will show up here as "unknown" until they say yes.</div>' : '');
+    } else if (promoView === 'compose') {
+      h += '<div class="card"><div class="field"><label>Message (max 500 characters)</label><textarea id="promoBody" rows="5" maxlength="500">' + esc(promoBody) + '</textarea><div class="hint small muted"><span id="promoLen">' + promoBody.length + '</span>/500</div></div>' +
+        '<label class="small"><input type="checkbox" id="promoSponsor"' + (promoSponsor ? ' checked' : '') + '> Add sponsor line</label>' +
+        '<div class="field"><label>Sponsor line</label><input id="promoSponsorText" maxlength="80" value="' + esc(promoSponsorText) + '"' + (promoSponsor ? '' : '') + '></div>' +
+        '<label class="small"><input type="checkbox" id="promoImage"' + (promoImage ? ' checked' : '') + '> This promo has a picture (the text is the caption; the sponsor line stays above STOP)</label>' +
+        '<div class="field"><label>Send later (optional, Guyana time)</label><input id="promoWhen" type="datetime-local" value="' + esc(promoWhen) + '"></div>' +
+        '<h3>Preview' + (promoImage ? ' (caption)' : '') + '</h3><pre class="promo-preview" id="promoPreview">' + esc(promoPreview ? promoPreview.text : 'The exact message appears here.') + '</pre>' +
+        '<p class="small muted" id="promoMeta">' + (promoPreview ? promoPreview.chars + ' characters · ' + promoPreview.recipients + ' opted-in recipients' : '') + '</p>' +
+        '<div class="acts"><button class="btn" id="promoRefresh">Update preview</button><button class="btn" id="promoTest">Send test to me</button><button class="btn red" id="promoSend">Send</button></div></div>';
+    } else {
+      const rows = P.promos || [];
+      h += rows.length ? rows.map(p => '<div class="card"><div class="oh"><b>' + esc(p.id) + '</b> ' + (p.test ? '<span class="tag test">TEST</span>' : '') + ' <span class="tag ' + (p.status === 'done' ? 'ready' : p.status === 'cancelled' ? 'collected' : 'ph') + '">' + esc(p.status) + '</span></div>' +
+        '<p class="small">sent ' + p.sent + ' · queued ' + p.queued + ' · failed ' + p.failed + ' · skipped ' + p.skipped + ' / ' + p.total + (p.hold ? ' · <b>' + esc(p.hold) + '</b>' : '') + (p.pausedReason ? ' · ' + esc(p.pausedReason) : '') + (p.sponsor ? ' · sponsor: ' + esc(p.sponsorText) : '') + '</p>' +
+        '<pre class="promo-preview">' + esc(p.preview || '') + '</pre>' +
+        '<div class="acts">' + (p.status === 'running' || p.status === 'scheduled' ? '<button class="btn sm" data-pop="pause" data-pid="' + esc(p.id) + '">Pause</button>' : '') +
+        (p.status === 'paused' ? '<button class="btn sm" data-pop="resume" data-pid="' + esc(p.id) + '">Resume</button>' : '') +
+        (p.editable ? '<button class="btn sm" data-pedit="' + esc(p.id) + '">Edit</button>' : '') +
+        (p.status !== 'done' && p.status !== 'cancelled' ? '<button class="btn sm" data-pop="cancel" data-pid="' + esc(p.id) + '">Cancel</button>' : '') + '</div></div>').join('') : '<div class="empty card">Nothing in the queue.</div>';
+    }
+    $('tab-promo').innerHTML = h;
+    const body = $('promoBody');
+    if (body) body.oninput = () => { promoBody = body.value; const n = $('promoLen'); if (n) n.textContent = body.value.length; };
+    const st = $('promoSponsorText'); if (st) st.oninput = () => { promoSponsorText = st.value; };
+    const wh = $('promoWhen'); if (wh) wh.onchange = () => { promoWhen = wh.value; };
+  }
+  async function refreshPromoPreview() {
+    const j = await api('status', { promo: { op: 'preview', body: promoBody, sponsor: promoSponsor, sponsorText: promoSponsorText, image: promoImage } });
+    promoPreview = j; renderPromo();
+  }
+  $('tab-promo').addEventListener('change', (e) => {
+    if (e.target.id === 'promoSponsor') { promoSponsor = e.target.checked; refreshPromoPreview().catch(err => toast('⚠️ ' + err.message)); }
+    if (e.target.id === 'promoImage') { promoImage = e.target.checked; refreshPromoPreview().catch(err => toast('⚠️ ' + err.message)); }
+  });
+  $('tab-promo').addEventListener('click', async (e) => {
+    const b = e.target.closest('button'); if (!b) return;
+    if (b.dataset.pv) { promoView = b.dataset.pv; return renderPromo(); }
+    if (b.dataset.copt) { if (b.dataset.copt === 'stopped' && !confirm('Stop specials for this customer?')) return; await act('status', { promo: { op: 'opt', id: b.dataset.cid, status: b.dataset.copt } }, 'Updated'); return; }
+    if (b.dataset.pop) { await act('status', { promo: { op: b.dataset.pop, id: b.dataset.pid } }, b.dataset.pop); return; }
+    if (b.dataset.pedit) {
+      const p = (D.promo.promos || []).find(x => x.id === b.dataset.pedit); if (!p) return;
+      openSheet('<h3>Edit ' + esc(p.id) + '</h3><p class="muted small">You can change this until the first message goes out.</p><div class="field"><label>Message</label><textarea id="edBody" rows="4" maxlength="500">' + esc(p.body) + '</textarea></div><label class="small"><input type="checkbox" id="edSp"' + (p.sponsor ? ' checked' : '') + '> Add sponsor line</label><div class="field"><label>Sponsor line</label><input id="edSpText" maxlength="80" value="' + esc(p.sponsorText || promoSponsorText) + '"></div><div class="acts"><button class="btn" data-close>Cancel</button><button class="btn primary" id="edSave">Save</button></div>');
+      $('edSave').onclick = async () => { const j = await act('status', { promo: { op: 'edit', id: p.id, body: $('edBody').value, sponsor: $('edSp').checked, sponsorText: $('edSpText').value } }, 'Promo updated'); if (j) closeSheet(); };
+      return;
+    }
+    if (b.id === 'promoRefresh') { try { await refreshPromoPreview(); } catch (err) { toast('⚠️ ' + err.message); } return; }
+    if (b.id === 'promoTest') {
+      try { await refreshPromoPreview(); } catch (err) { return toast('⚠️ ' + err.message); }
+      openSheet('<h3>Send test to me?</h3><p>This sends <b>one TEST message</b> to the shop\'s own WhatsApp chat only. No customer gets it.</p><pre class="promo-preview">' + esc(promoPreview.text) + '</pre><div class="acts"><button class="btn" data-close>Cancel</button><button class="btn primary" id="doTest">Send test</button></div>');
+      $('doTest').onclick = async () => { $('doTest').disabled = true; const j = await act('status', { promo: { op: 'test', body: promoBody, sponsor: promoSponsor, sponsorText: promoSponsorText, image: promoImage } }, 'Test queued to the own chat'); if (j) { closeSheet(); promoView = 'progress'; } };
+      return;
+    }
+    if (b.id === 'promoSend') {
+      try { await refreshPromoPreview(); } catch (err) { return toast('⚠️ ' + err.message); }
+      const n = promoPreview.recipients;
+      openSheet('<h3>Send this promo?</h3><p>This will message <b>' + n + '</b> opted-in customer' + (n === 1 ? '' : 's') + '. Stopped customers, anyone who hasn\'t said yes, 592 712 2188 and this line are not included. Each message ends with "Reply STOP to stop".</p><pre class="promo-preview">' + esc(promoPreview.text) + '</pre><div class="acts"><button class="btn" data-close>Cancel</button><button class="btn red" id="doSend"' + (n ? '' : ' disabled') + '>Send to ' + n + '</button></div>');
+      $('doSend').onclick = async () => {
+        $('doSend').disabled = true;
+        const sendAt = promoWhen ? new Date(promoWhen).toISOString() : '';
+        const j = await act('status', { promo: { op: 'send', confirm: true, body: promoBody, sponsor: promoSponsor, sponsorText: promoSponsorText, image: promoImage, sendAt } }, n + ' queued');
+        if (j) { closeSheet(); promoView = 'progress'; }
+      };
+    }
+  });
 
   // ---------- boot ----------
   if (!RAW || !CFG.ASSISTANT_API) { document.body.innerHTML = '<p style="padding:20px">POS not configured.</p>'; return; }
