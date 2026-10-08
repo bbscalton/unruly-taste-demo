@@ -77,9 +77,14 @@
   function showLogin(msg) { $('login').classList.remove('hidden'); $('loginErr').textContent = msg && localStorage.getItem(TOKEN_KEY) ? msg : ''; localStorage.removeItem(TOKEN_KEY); clearInterval(pollT); setTimeout(() => $('pin').focus(), 50); }
   $('loginForm').addEventListener('submit', async (e) => {
     e.preventDefault(); const v = $('pin').value.trim(); if (!v) return;
-    localStorage.setItem(TOKEN_KEY, v); $('loginErr').textContent = '';
-    try { await api('auth'); $('login').classList.add('hidden'); $('pin').value = ''; startPoll(); }
-    catch (err) { $('loginErr').textContent = err.message; localStorage.removeItem(TOKEN_KEY); }
+    $('loginErr').textContent = '';
+    try {
+      const r = await fetch(API + 'auth', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pin: v }) });
+      let j = {}; try { j = await r.json(); } catch {}
+      if (!r.ok || !j.session) throw new Error(j.error || 'Wrong staff PIN');
+      localStorage.setItem(TOKEN_KEY, j.session);
+      $('login').classList.add('hidden'); $('pin').value = ''; startPoll();
+    } catch (err) { $('loginErr').textContent = err.message; localStorage.removeItem(TOKEN_KEY); }
   });
 
   // ---------- tabs ----------
@@ -99,12 +104,16 @@
     $('bellCount').textContent = low; $('bellCount').classList.toggle('hidden', !low);
     const pq = D.printQueued || 0; $('pqCount').textContent = pq; $('pqCount').classList.toggle('hidden', !pq);
     const pr = (D.promo && D.promo.promos || []).filter(p => p.status === 'running' || p.status === 'scheduled').length; if ($('promoCount')) { $('promoCount').textContent = pr; $('promoCount').classList.toggle('hidden', !pr); }
+    const role = D.me && D.me.role;
+    const ab = $('tabAdminBtn'); if (ab) ab.classList.toggle('hidden', role !== 'owner' && role !== 'manager');
     processPrintQueue();
+    if (!window._utAdminOnce && (location.hash === '#admin' || /[?&]admin=1/.test(location.search)) && (role === 'owner' || role === 'manager')) { window._utAdminOnce = 1; return setTab('admin'); }
     if (tab === 'orders') renderOrders();
     else if (tab === 'walkin') renderWalkin();
     else if (tab === 'stock') renderStock();
     else if (tab === 'today') renderToday();
     else if (tab === 'promo') renderPromo();
+    else if (tab === 'admin') renderAdmin();
     else if (tab === 'settings' && (forceSettings || !dirtySettings)) renderSettings();
   }
   const exampleNote = () => { const n = { example: 0, estimate: 0, real: 0 }; D.ingredients.forEach(i => n[labelOf(i)]++);
@@ -313,7 +322,9 @@
   // ---------- SETTINGS ----------
   let SD = null;   // editable copy
   function renderSettings() {
-    SD = { vendors: JSON.parse(JSON.stringify(D.vendors)), ingredients: D.ingredients.map(i => ({ id: i.id, name: i.name, unit: i.unit, costPerUnit: i.costPerUnit, costLabel: labelOf(i), costSource: i.costSource || null, vendorId: i.vendorId, min: { ...i.min } })), recipes: JSON.parse(JSON.stringify(D.recipes)), settings: { readyText: D.settings.readyText, readyTextDelivery: D.settings.readyTextDelivery, lowStockWhatsApp: D.settings.lowStockWhatsApp, printer: { ...PR() }, receipt: { ...RS() } } };
+    SD = { vendors: JSON.parse(JSON.stringify(D.vendors)), ingredients: D.ingredients.map(i => ({ id: i.id, name: i.name, unit: i.unit, costPerUnit: i.costPerUnit, costLabel: labelOf(i), costSource: i.costSource || null, vendorId: i.vendorId, min: { ...i.min } })), recipes: JSON.parse(JSON.stringify(D.recipes)), settings: { readyText: D.settings.readyText, readyTextDelivery: D.settings.readyTextDelivery, lowStockWhatsApp: D.settings.lowStockWhatsApp, printer: { ...PR() }, receipt: { ...RS() },
+      promo: { sponsorDefault: (D.settings.promo && D.settings.promo.sponsorDefault) || 'Sponsored by Neuereatec', dailyCap: (D.settings.promo && D.settings.promo.dailyCap) || 150, tags: (D.settings.promo && D.settings.promo.tags) || [] },
+      shop: { closedWeekdays: [...((D.settings.shop && D.settings.shop.closedWeekdays) || [])], closedDates: [...((D.settings.shop && D.settings.shop.closedDates) || [])] } } };
     drawSettings();
   }
   function drawSettings() {
@@ -332,9 +343,16 @@
       '<label class="small"><input type="checkbox" data-sr="showPhone"' + (SD.settings.receipt.showPhone ? ' checked' : '') + '> Business phone on receipt</label>' +
       '<div class="field"><label>Business phone (receipts only)</label><input data-sr="phone" value="' + esc(SD.settings.receipt.phone || '') + '" maxlength="20" placeholder="(not set)" style="max-width:220px"></div>' +
       '<label class="small"><input type="checkbox" id="printStation"' + (localStorage.getItem(PS_KEY) === '1' ? ' checked' : '') + '> This device is the print station (prints queued receipts automatically once a real printer driver is chosen)</label></div>';
-    h += '<h3>Promo sponsor line (owner)</h3><div class="card"><p class="muted small">Default sponsor line for new promos. Each promo stays off until "Add sponsor line" is ticked. Only the owner should change this.</p>' +
+    const WDN = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+    const owner = D.me && D.me.role === 'owner';
+    h += '<h3 id="closedDays">Shop closed days' + (owner ? '' : ' (owner)') + '</h3><div class="card" id="closedCard"><p class="muted small">A scheduled promo on a closed day is skipped (nothing is sent) and you get one note on the shop chat. Weekly repeats skip that week. A blast already going out stops at midnight if the next day is closed.</p>' +
+      '<div class="chips">' + WDN.map((n, i) => '<label class="chip' + (SD.settings.shop.closedWeekdays.includes(i) ? ' on' : '') + '"><input type="checkbox" data-cwd="' + i + '"' + (SD.settings.shop.closedWeekdays.includes(i) ? ' checked' : '') + (owner ? '' : ' disabled') + '> ' + n + '</label>').join('') + '</div>' +
+      '<p class="small">One-off closed dates</p><ul class="small">' + (SD.settings.shop.closedDates.map(d => '<li>' + esc(d) + (owner ? ' <button class="btn sm" data-cdd="' + esc(d) + '">remove</button>' : '') + '</li>').join('') || '<li class="muted">None</li>') + '</ul>' +
+      (owner ? '<div class="acts"><input type="date" id="closedAdd"><button class="btn sm" id="closedAddBtn" type="button">Add closed date</button></div>' : '') + '</div>';
+    h += '<h3>Promo sponsor line (owner)</h3><div class="card"><p class="muted small">Default sponsor line for new promos. Each promo stays off until "Add sponsor line" is ticked.</p>' +
       '<div class="field"><label>Default sponsor line</label><input data-spromo="sponsorDefault" maxlength="80" value="' + esc(SD.settings.promo.sponsorDefault) + '"></div>' +
-      '<div class="field"><label>Most promos per day</label><input data-spromo="dailyCap" type="number" min="10" max="500" value="' + esc(SD.settings.promo.dailyCap) + '" style="max-width:120px"></div></div>';
+      '<div class="field"><label>Most promos per day</label><input data-spromo="dailyCap" type="number" min="10" max="500" value="' + esc(SD.settings.promo.dailyCap) + '" style="max-width:120px"></div>' +
+      '<div class="field"><label>Customer groups (comma separated)</label><input data-spromo="tags" value="' + esc((SD.settings.promo.tags || []).join(', ')) + '"></div></div>';
     h += '<h3>Ingredients &amp; costs</h3><div class="scroll"><table class="t"><tr><th>Name</th><th>Unit</th><th>Cost / unit (G$)</th><th>Label</th><th>Source</th><th>Low-stock minimum</th><th>Vendor</th></tr>' + SD.ingredients.map((i, k) =>
       '<tr><td><input data-i="' + k + '" data-f="name" value="' + esc(i.name) + '"></td><td><input data-i="' + k + '" data-f="unit" value="' + esc(i.unit) + '" style="min-width:55px"></td><td><input type="number" step="0.01" data-i="' + k + '" data-f="costPerUnit" value="' + i.costPerUnit + '"></td>' +
       '<td><select data-i="' + k + '" data-f="costLabel" style="width:auto">' + Object.keys(LBL).map(l => '<option value="' + l + '"' + (i.costLabel === l ? ' selected' : '') + '>' + LBL[l][1] + '</option>').join('') + '</select></td>' +
@@ -365,7 +383,8 @@
     const t = e.target, d = t.dataset; dirtySettings = true;
     const val = t.type === 'checkbox' ? t.checked : t.value;
     if (t.id === 'printStation') { localStorage.setItem(PS_KEY, t.checked ? '1' : '0'); dirtySettings = false; return toast(t.checked ? 'This device is the print station' : 'Print station off on this device'); }
-    if (d.spromo) { SD.settings.promo[d.spromo] = d.spromo === 'dailyCap' ? +val : val; }
+    if (d.cwd != null) { const i = +d.cwd; const set = new Set(SD.settings.shop.closedWeekdays); if (t.checked) set.add(i); else set.delete(i); SD.settings.shop.closedWeekdays = [...set].sort(); }
+    else if (d.spromo) { if (d.spromo === 'tags') SD.settings.promo.tags = String(val).split(',').map(x => x.trim()).filter(Boolean); else SD.settings.promo[d.spromo] = d.spromo === 'dailyCap' ? +val : val; }
     else if (d.sp) SD.settings.printer[d.sp] = d.sp === 'paperWidth' ? +val : val;
     else if (d.sr) SD.settings.receipt[d.sr] = val;
     else if (d.s) SD.settings[d.s] = val;
@@ -382,6 +401,8 @@
     if (b.dataset.rr) { dirtySettings = true; SD.recipes[b.dataset.rr].rules.splice(+b.dataset.k, 1); return drawSettings(); }
     if (b.id === 'resetS') { dirtySettings = false; return renderSettings(); }
     if (b.id === 'signOut') { localStorage.removeItem(TOKEN_KEY); return location.reload(); }
+    if (b.id === 'closedAddBtn') { const v = ($('closedAdd') || {}).value; if (!v) return; dirtySettings = true; if (!SD.settings.shop.closedDates.includes(v)) SD.settings.shop.closedDates.push(v); return drawSettings(); }
+    if (b.dataset.cdd) { dirtySettings = true; SD.settings.shop.closedDates = SD.settings.shop.closedDates.filter(x => x !== b.dataset.cdd); return drawSettings(); }
     if (b.id === 'saveS') { b.disabled = true; const j = await act('settings', SD, 'Settings saved'); b.disabled = false; if (j) { dirtySettings = false; renderSettings(); } }
   });
 
@@ -556,80 +577,194 @@
     } catch (e) { toast('⚠️ Printer: ' + e.message); } finally { printing = false; }
   }
 
+  // ---------- ADMIN (owner: users. owner/manager: customers) ----------
+  let adminUsers = null, adminAudit = null;
+  const canBlast = () => D.me && (D.me.role === 'owner' || D.me.role === 'manager');
+  async function renderAdmin() {
+    const role = D.me && D.me.role;
+    let h = '<h2>Admin</h2><p class="muted small">Signed in as <b>' + esc((D.me && D.me.name) || '') + '</b> (' + esc(role || '') + '). Staff can take orders. Only the owner or a manager can change customers or send promos. Only the owner changes PINs.</p>';
+    if (role === 'owner') {
+      if (!adminUsers) { try { const j = await api('status', { admin: { op: 'users' } }); adminUsers = j.users || []; adminAudit = j.audit || []; } catch (e) { h += '<div class="note">' + esc(e.message) + '</div>'; } }
+      h += '<h3>Staff</h3><div class="card"><div class="scroll"><table class="t"><tr><th>Name</th><th>Role</th><th></th></tr>' + (adminUsers || []).map(u => '<tr><td>' + esc(u.name) + (u.disabled ? ' <span class="tag collected">off</span>' : '') + '</td><td>' + esc(u.role) + '</td><td><button class="btn sm" data-upin="' + esc(u.id) + '">New PIN</button></td></tr>').join('') + '</table></div>' +
+        '<h3>Add manager or staff</h3><div class="field"><label>Name</label><input id="nuName" maxlength="40"></div><div class="field"><label>Role</label><select id="nuRole" style="width:auto"><option value="staff">staff</option><option value="manager">manager</option></select></div><div class="field"><label>PIN (8+ characters)</label><input id="nuPin" type="password" autocomplete="new-password"></div><button class="btn" id="nuAdd" type="button">Add user</button></div>';
+    }
+    const P = D.promo || { customers: [] };
+    h += '<h3>Customers</h3><div class="card"><p class="muted small">Numbers stay masked in the list. Edit shows the full number to the owner or a manager, and every change is written to the audit log (who, when, before, after).</p>' +
+      '<div class="acts"><button class="btn sm" id="cuAdd" type="button">Add customer</button></div>' +
+      '<div class="scroll"><table class="t"><tr><th>Name</th><th>WhatsApp</th><th>Groups</th><th>Specials</th><th></th></tr>' +
+      (P.customers || []).map(c => '<tr><td>' + esc(c.name || '–') + '</td><td>' + esc(c.number) + '</td><td class="small">' + esc((c.tags || []).join(', ')) + '</td><td>' + esc(c.opt) + '</td><td><button class="btn sm" data-cedit="' + esc(c.id) + '">Edit</button></td></tr>').join('') +
+      '</table></div></div>';
+    if (role === 'owner' && adminAudit) {
+      h += '<h3>Audit log</h3><div class="card small">' + (adminAudit.slice(0, 12).map(a => '<div>' + esc((a.at || '').slice(0, 16).replace('T', ' ')) + ' · ' + esc(a.user) + ' · <b>' + esc(a.action) + '</b></div>').join('') || '<span class="muted">No changes yet.</span>') + '</div>';
+    }
+    $('tab-admin').innerHTML = h;
+  }
+  $('tab-admin').addEventListener('click', async (e) => {
+    const b = e.target.closest('button'); if (!b) return;
+    if (b.id === 'nuAdd') {
+      try { const j = await api('status', { admin: { op: 'user-add', name: $('nuName').value, role: $('nuRole').value, pin: $('nuPin').value } }); adminUsers = j.users; toast('User added'); renderAdmin(); }
+      catch (err) { toast('⚠️ ' + err.message); }
+      return;
+    }
+    if (b.dataset.upin) {
+      const pin = prompt('New PIN (8+ characters). The old PIN stops working.');
+      if (!pin) return;
+      try { await api('status', { admin: { op: 'user-pin', id: b.dataset.upin, pin } }); toast('PIN changed'); } catch (err) { toast('⚠️ ' + err.message); }
+      return;
+    }
+    if (b.id === 'cuAdd') return customerSheet(null);
+    if (b.dataset.cedit) return customerSheet(b.dataset.cedit);
+  });
+  async function customerSheet(id) {
+    let c = { id: '', name: '', phone: '', tags: [] };
+    if (id) { try { const j = await api('status', { admin: { op: 'customer', id } }); c = j.customer; } catch (e) { return toast('⚠️ ' + e.message); } }
+    const tags = ((D.settings.promo && D.settings.promo.tags) || []).map(t => '<label class="small"><input type="checkbox" data-ctag="' + esc(t) + '"' + ((c.tags || []).includes(t) ? ' checked' : '') + '> ' + esc(t) + '</label>').join(' ');
+    openSheet('<h3>' + (id ? 'Edit customer' : 'Add customer') + '</h3><div class="field"><label>Name</label><input id="cuName" value="' + esc(c.name || '') + '"></div><div class="field"><label>WhatsApp number</label><input id="cuPhone" value="' + esc(c.phone || '') + '" inputmode="tel"></div><div class="field"><label>Groups</label><div>' + tags + '</div></div><div class="acts"><button class="btn" data-close>Cancel</button>' + (id ? '<button class="btn" id="cuDel">Remove</button>' : '') + '<button class="btn primary" id="cuSave">Save</button></div>');
+    $('cuSave').onclick = async () => {
+      const tagsOn = [...document.querySelectorAll('[data-ctag]:checked')].map(x => x.dataset.ctag);
+      const body = { name: $('cuName').value, phone: $('cuPhone').value, tags: tagsOn };
+      try {
+        await api('status', { admin: id ? { op: 'customer-edit', id, ...body } : { op: 'customer-add', ...body } });
+        closeSheet(); toast('Customer saved'); await sync(true);
+      } catch (err) { toast('⚠️ ' + err.message); }
+    };
+    const del = $('cuDel');
+    if (del) del.onclick = async () => { if (!confirm('Remove this customer from the list? Their past orders stay.')) return; try { await api('status', { admin: { op: 'customer-remove', id } }); closeSheet(); toast('Removed'); await sync(true); } catch (err) { toast('⚠️ ' + err.message); } };
+  }
+
   // ---------- PROMOS ----------
-  let promoView = 'customers', promoBody = '', promoSponsor = false, promoSponsorText = '', promoImage = false, promoWhen = '', promoPreview = null;
+  let promoView = 'customers', promoBody = '', promoSponsor = false, promoSponsorText = '', promoImageId = '', promoImagePreview = '', promoWhen = '', promoRepeat = false, promoPreview = null;
+  let promoAud = { mode: 'all', ids: [], groups: [], includeUnknown: false }, promoQ = '', promoList = 'upcoming';
+  function audiencePayload() { return { mode: promoAud.mode, ids: promoAud.ids, groups: promoAud.groups, includeUnknown: !!promoAud.includeUnknown }; }
+  function excludedLine(ex) {
+    ex = ex || {};
+    return 'Not included: stopped ' + (ex.stopped || 0) + ', said no ' + (ex.no || 0) + ', not opted in ' + (ex.unknown || 0) + ', blocked ' + (ex.blocked || 0) + ', this line ' + (ex.own || 0) + '.';
+  }
   function renderPromo() {
     const P = D.promo || { customers: [], optedIn: 0, promos: [], sentToday: 0, dailyCap: 150 };
     const def = (D.settings.promo && D.settings.promo.sponsorDefault) || 'Sponsored by Neuereatec';
     if (!promoSponsorText) promoSponsorText = def;
-    const chip = (id, label) => '<button class="chip ' + (promoView === id ? 'on' : '') + '" data-pv="' + id + '">' + label + '</button>';
-    let h = '<h2>Promos</h2><div class="chips">' + chip('customers', 'Customers (' + (P.customerCount || P.customers.length) + ')') + chip('compose', 'New promo') + chip('progress', 'Sending') + '</div>';
-    h += '<p class="muted small">Opted in: <b>' + (P.optedIn || 0) + '</b> · sent today ' + (P.sentToday || 0) + ' / ' + (P.dailyCap || 150) + '. Nobody is messaged unless they clearly said yes. 592 712 2188 and this line are never included. ' + (P.bridgePromo === false ? '<b>Customer sending is waiting for the WhatsApp bridge update.</b> Test-to-me still works.' : '') + '</p>';
+    const blast = canBlast();
+    const chip = (id, label) => '<button class="chip ' + (promoView === id ? 'on' : '') + '" data-pv="' + id + '" type="button">' + label + '</button>';
+    let h = '<h2>Promos</h2><div class="chips">' + chip('customers', 'Customers (' + (P.customerCount || P.customers.length) + ')') + chip('compose', 'New promo') + chip('list', 'Scheduled') + '</div>';
+    h += '<p class="muted small">Opted in: <b>' + (P.optedIn || 0) + '</b> · sent today ' + (P.sentToday || 0) + ' / ' + (P.dailyCap || 150) + '. Stopped, said-no, 592 712 2188 and this line are never included. ' + (P.bridgePromo === false ? '<b>Customer sending waits for the WhatsApp bridge update.</b> ' : '') + (blast ? '' : '<b>You can look, but only the owner or a manager can send.</b>') + '</p>';
     if (promoView === 'customers') {
-      h += '<div class="scroll"><table class="t"><tr><th>Name</th><th>WhatsApp</th><th>Orders</th><th>First</th><th>Last</th><th>From</th><th>Specials</th><th></th></tr>' +
-        (P.customers || []).map(c => '<tr><td>' + esc(c.name || '–') + '</td><td>' + esc(c.number) + '</td><td>' + c.orders + '</td><td class="small">' + esc((c.firstAt || '').slice(0, 10)) + '</td><td class="small">' + esc((c.lastAt || '').slice(0, 10)) + '</td><td class="small">' + esc((c.sources || []).join(', ')) + '</td><td><span class="tag ' + (c.opt === 'yes' ? 'ready' : c.opt === 'stopped' ? 'collected' : 'ph') + '">' + esc(c.opt) + '</span>' + (c.optHow ? '<div class="muted small">' + esc(c.optHow) + (c.optAt ? ' · ' + esc(c.optAt.slice(0, 16).replace('T', ' ')) : '') + '</div>' : '') + '</td><td style="white-space:nowrap"><button class="btn sm" data-copt="yes" data-cid="' + esc(c.id) + '">Yes</button> <button class="btn sm" data-copt="no" data-cid="' + esc(c.id) + '">No</button> <button class="btn sm" data-copt="stopped" data-cid="' + esc(c.id) + '">Stop</button></td></tr>').join('') +
-        '</table></div>' + (!(P.customers || []).length ? '<div class="empty card">No customers with a WhatsApp number yet. Orders from calls and the website will show up here as "unknown" until they say yes.</div>' : '');
+      h += '<div class="scroll"><table class="t"><tr><th>Name</th><th>WhatsApp</th><th>Orders</th><th>Groups</th><th>Specials</th><th></th></tr>' +
+        (P.customers || []).map(c => '<tr><td>' + esc(c.name || '–') + '</td><td>' + esc(c.number) + '</td><td>' + c.orders + '</td><td class="small">' + esc((c.tags || []).join(', ')) + '</td><td><span class="tag ' + (c.opt === 'yes' ? 'ready' : c.opt === 'stopped' || c.opt === 'no' ? 'collected' : 'ph') + '">' + esc(c.opt) + '</span></td><td>' + (blast ? '<button class="btn sm" data-cedit="' + esc(c.id) + '" type="button">Edit</button>' : '') + '</td></tr>').join('') +
+        '</table></div>';
     } else if (promoView === 'compose') {
-      h += '<div class="card"><div class="field"><label>Message (max 500 characters)</label><textarea id="promoBody" rows="5" maxlength="500">' + esc(promoBody) + '</textarea><div class="hint small muted"><span id="promoLen">' + promoBody.length + '</span>/500</div></div>' +
+      const tags = (D.settings.promo && D.settings.promo.tags) || [];
+      const smart = [['smart:7d', 'Ordered in 7 days'], ['smart:30d', 'Ordered in 30 days'], ['smart:source:phone-call', 'Phone calls'], ['smart:source:web-chat', 'Web chat'], ['smart:source:web-voice', 'Web voice'], ['smart:source:whatsapp', 'WhatsApp orders']];
+      const q = promoQ.toLowerCase();
+      const people = (P.customers || []).filter(c => !q || (c.name || '').toLowerCase().includes(q) || (c.number || '').includes(q));
+      const shop = D.settings.shop || { closedWeekdays: [], closedDates: [] };
+      const whenDay = promoWhen ? promoWhen.slice(0, 10) : '';
+      const whenClosed = whenDay && (shop.closedDates || []).includes(whenDay);
+      h += '<div class="card" id="promoCompose">' +
+        '<div class="field"><label>Message (max 500)</label><textarea id="promoBody" rows="4" maxlength="500">' + esc(promoBody) + '</textarea><div class="hint small muted"><span id="promoLen">' + promoBody.length + '</span>/500</div></div>' +
         '<label class="small"><input type="checkbox" id="promoSponsor"' + (promoSponsor ? ' checked' : '') + '> Add sponsor line</label>' +
-        '<div class="field"><label>Sponsor line</label><input id="promoSponsorText" maxlength="80" value="' + esc(promoSponsorText) + '"' + (promoSponsor ? '' : '') + '></div>' +
-        '<label class="small"><input type="checkbox" id="promoImage"' + (promoImage ? ' checked' : '') + '> This promo has a picture (the text is the caption; the sponsor line stays above STOP)</label>' +
-        '<div class="field"><label>Send later (optional, Guyana time)</label><input id="promoWhen" type="datetime-local" value="' + esc(promoWhen) + '"></div>' +
-        '<h3>Preview' + (promoImage ? ' (caption)' : '') + '</h3><pre class="promo-preview" id="promoPreview">' + esc(promoPreview ? promoPreview.text : 'The exact message appears here.') + '</pre>' +
-        '<p class="small muted" id="promoMeta">' + (promoPreview ? promoPreview.chars + ' characters · ' + promoPreview.recipients + ' opted-in recipients' : '') + '</p>' +
-        '<div class="acts"><button class="btn" id="promoRefresh">Update preview</button><button class="btn" id="promoTest">Send test to me</button><button class="btn red" id="promoSend">Send</button></div></div>';
+        '<div class="field"><label>Sponsor line</label><input id="promoSponsorText" maxlength="80" value="' + esc(promoSponsorText) + '"></div>' +
+        '<div class="field"><label>Picture (JPG, PNG or WEBP, under 1.5 MB)</label><input type="file" id="promoFile" accept="image/jpeg,image/png,image/webp">' +
+        (promoImagePreview ? '<img id="promoImg" alt="Promo picture" src="' + promoImagePreview + '" style="max-width:180px;border-radius:8px;display:block;margin-top:6px">' : '') + '</div>' +
+        '<h3>Who gets it</h3>' +
+        '<label class="small"><input type="radio" name="pam" value="all"' + (promoAud.mode === 'all' ? ' checked' : '') + '> All opted-in</label> ' +
+        '<label class="small"><input type="radio" name="pam" value="ids"' + (promoAud.mode === 'ids' ? ' checked' : '') + '> Pick people</label> ' +
+        '<label class="small"><input type="radio" name="pam" value="groups"' + (promoAud.mode === 'groups' ? ' checked' : '') + '> Groups</label>' +
+        (promoAud.mode === 'ids' ? '<div class="field"><input id="promoQ" placeholder="Search name or last 4" value="' + esc(promoQ) + '"><div class="scroll" style="max-height:160px">' + people.map(c => '<label class="small" style="display:block"><input type="checkbox" data-pid="' + esc(c.id) + '"' + (promoAud.ids.includes(c.id) ? ' checked' : '') + '> ' + esc(c.name || '–') + ' ' + esc(c.number) + ' <span class="muted">' + esc(c.opt) + '</span></label>').join('') + '</div></div>' : '') +
+        (promoAud.mode === 'groups' ? '<div>' + tags.map(t => '<label class="small" style="display:block"><input type="checkbox" data-pg="tag:' + esc(t) + '"' + (promoAud.groups.includes('tag:' + t) ? ' checked' : '') + '> ' + esc(t) + '</label>').join('') + smart.map(([id, label]) => '<label class="small" style="display:block"><input type="checkbox" data-pg="' + id + '"' + (promoAud.groups.includes(id) ? ' checked' : '') + '> ' + label + '</label>').join('') + '</div>' : '') +
+        (blast ? '<label class="small"><input type="checkbox" id="promoUnknown"' + (promoAud.includeUnknown ? ' checked' : '') + '> Include customers who haven\'t opted in (unknown)</label><p class="note" id="unknownWarn">WhatsApp can block the shared 712 9487 line if you message people who never agreed. Stopped and said-no stay out. This needs a second confirm and is written to the audit log.</p>' : '') +
+        '<div class="field"><label>Send later (Guyana time, optional)</label><input id="promoWhen" type="datetime-local" value="' + esc(promoWhen) + '">' + (whenClosed ? '<div class="note">This date is a closed day. It will be skipped unless you confirm.</div>' : '') + '</div>' +
+        '<label class="small"><input type="checkbox" id="promoRepeat"' + (promoRepeat ? ' checked' : '') + '> Repeat every week (skips weeks the shop is closed)</label>' +
+        '<h3>Preview' + (promoImageId ? ' (caption)' : '') + '</h3>' + (promoImagePreview ? '<img alt="" src="' + promoImagePreview + '" style="max-width:120px;border-radius:8px">' : '') + '<pre class="promo-preview" id="promoPreview">' + esc(promoPreview ? promoPreview.text : 'The exact message appears here.') + '</pre>' +
+        '<p class="small muted" id="promoMeta">' + (promoPreview ? promoPreview.chars + ' characters · ' + promoPreview.recipients + ' will get it. ' + excludedLine(promoPreview.excluded) : '') + '</p>' +
+        '<div class="acts"><button class="btn" id="promoRefresh" type="button">Update preview</button>' + (blast ? '<button class="btn" id="promoTest" type="button">Send test to me</button><button class="btn red" id="promoSend" type="button">Send</button>' : '') + '</div></div>';
     } else {
-      const rows = P.promos || [];
-      h += rows.length ? rows.map(p => '<div class="card"><div class="oh"><b>' + esc(p.id) + '</b> ' + (p.test ? '<span class="tag test">TEST</span>' : '') + ' <span class="tag ' + (p.status === 'done' ? 'ready' : p.status === 'cancelled' ? 'collected' : 'ph') + '">' + esc(p.status) + '</span></div>' +
-        '<p class="small">sent ' + p.sent + ' · queued ' + p.queued + ' · failed ' + p.failed + ' · skipped ' + p.skipped + ' / ' + p.total + (p.hold ? ' · <b>' + esc(p.hold) + '</b>' : '') + (p.pausedReason ? ' · ' + esc(p.pausedReason) : '') + (p.sponsor ? ' · sponsor: ' + esc(p.sponsorText) : '') + '</p>' +
+      const rows = (P.promos || []).filter(p => promoList === 'upcoming' ? (p.status === 'scheduled' || p.status === 'running' || p.status === 'paused') : promoList === 'sent' ? p.status === 'done' : promoList === 'missed' ? p.status === 'missed' : (p.status === 'skipped' || p.status === 'cancelled'));
+      const fchip = (id, label) => '<button class="chip ' + (promoList === id ? 'on' : '') + '" data-pl="' + id + '" type="button">' + label + '</button>';
+      h += '<div class="chips">' + fchip('upcoming', 'Upcoming') + fchip('sent', 'Sent') + fchip('missed', 'Missed') + fchip('skipped', 'Skipped') + '</div>';
+      h += rows.length ? rows.map(p => '<div class="card"><div class="oh"><b>' + esc(p.id) + '</b> ' + (p.test ? '<span class="tag test">TEST</span>' : '') + ' <span class="tag ' + (p.status === 'done' ? 'ready' : p.status === 'missed' || p.status === 'skipped' || p.status === 'cancelled' ? 'collected' : 'ph') + '">' + esc(p.status) + '</span> ' + (p.repeat === 'weekly' ? '<span class="tag">weekly</span>' : '') + '</div>' +
+        '<p class="small">' + (p.sendAt ? 'when ' + esc(p.sendAt.slice(0, 16).replace('T', ' ')) + ' UTC · ' : '') + 'sent ' + p.sent + ' · queued ' + p.queued + ' · failed ' + p.failed + ' · skipped ' + p.skipped + (p.hold ? ' · <b>' + esc(p.hold) + '</b>' : '') + (p.pausedReason ? ' · ' + esc(p.pausedReason) : '') + (p.sponsor ? ' · ' + esc(p.sponsorText) : '') + '</p>' +
         '<pre class="promo-preview">' + esc(p.preview || '') + '</pre>' +
-        '<div class="acts">' + (p.status === 'running' || p.status === 'scheduled' ? '<button class="btn sm" data-pop="pause" data-pid="' + esc(p.id) + '">Pause</button>' : '') +
-        (p.status === 'paused' ? '<button class="btn sm" data-pop="resume" data-pid="' + esc(p.id) + '">Resume</button>' : '') +
-        (p.editable ? '<button class="btn sm" data-pedit="' + esc(p.id) + '">Edit</button>' : '') +
-        (p.status !== 'done' && p.status !== 'cancelled' ? '<button class="btn sm" data-pop="cancel" data-pid="' + esc(p.id) + '">Cancel</button>' : '') + '</div></div>').join('') : '<div class="empty card">Nothing in the queue.</div>';
+        (blast ? '<div class="acts">' + (p.status === 'scheduled' ? '<button class="btn sm" data-now="' + esc(p.id) + '" type="button">Send now</button>' : '') + (p.status === 'running' || p.status === 'scheduled' ? '<button class="btn sm" data-pop="pause" data-pid="' + esc(p.id) + '" type="button">Pause</button>' : '') + (p.status === 'paused' ? '<button class="btn sm" data-pop="resume" data-pid="' + esc(p.id) + '" type="button">Resume</button>' : '') + (p.editable ? '<button class="btn sm" data-pedit="' + esc(p.id) + '" type="button">Edit</button>' : '') + (p.status !== 'done' && p.status !== 'cancelled' && p.status !== 'missed' ? '<button class="btn sm" data-pop="cancel" data-pid="' + esc(p.id) + '" type="button">Cancel</button>' : '') + '</div>' : '') + '</div>').join('') : '<div class="empty card">Nothing in this list.</div>';
     }
     $('tab-promo').innerHTML = h;
-    const body = $('promoBody');
-    if (body) body.oninput = () => { promoBody = body.value; const n = $('promoLen'); if (n) n.textContent = body.value.length; };
+    const body = $('promoBody'); if (body) body.oninput = () => { promoBody = body.value; const n = $('promoLen'); if (n) n.textContent = body.value.length; };
     const st = $('promoSponsorText'); if (st) st.oninput = () => { promoSponsorText = st.value; };
-    const wh = $('promoWhen'); if (wh) wh.onchange = () => { promoWhen = wh.value; };
+    const wh = $('promoWhen'); if (wh) wh.onchange = () => { promoWhen = wh.value; renderPromo(); };
+    const qq = $('promoQ'); if (qq) qq.oninput = () => { promoQ = qq.value; renderPromo(); const n = $('promoQ'); if (n) n.focus(); };
   }
   async function refreshPromoPreview() {
-    const j = await api('status', { promo: { op: 'preview', body: promoBody, sponsor: promoSponsor, sponsorText: promoSponsorText, image: promoImage } });
+    const j = await api('status', { promo: { op: 'preview', body: promoBody, sponsor: promoSponsor, sponsorText: promoSponsorText, image: !!promoImageId, imageId: promoImageId, audience: audiencePayload(), sendLocal: promoWhen } });
     promoPreview = j; renderPromo();
   }
+  async function uploadPromoFile(file) {
+    if (!file) return;
+    if (file.size > 1.5 * 1024 * 1024) throw new Error('Image is over 1.5 MB.');
+    const buf = new Uint8Array(await file.arrayBuffer());
+    const start = await api('status', { image: { op: 'start' } });
+    const step = 24000;
+    for (let i = 0; i < buf.length; i += step) {
+      let bin = ''; const slice = buf.subarray(i, i + step);
+      for (let k = 0; k < slice.length; k++) bin += String.fromCharCode(slice[k]);
+      await api('status', { image: { op: 'chunk', id: start.id, data: btoa(bin) } });
+    }
+    const fin = await api('status', { image: { op: 'finish', id: start.id } });
+    promoImageId = fin.imageId; promoImagePreview = fin.preview;
+    toast('Picture saved'); renderPromo();
+  }
   $('tab-promo').addEventListener('change', (e) => {
-    if (e.target.id === 'promoSponsor') { promoSponsor = e.target.checked; refreshPromoPreview().catch(err => toast('⚠️ ' + err.message)); }
-    if (e.target.id === 'promoImage') { promoImage = e.target.checked; refreshPromoPreview().catch(err => toast('⚠️ ' + err.message)); }
+    const t = e.target;
+    if (t.id === 'promoSponsor') { promoSponsor = t.checked; refreshPromoPreview().catch(err => toast('⚠️ ' + err.message)); }
+    if (t.id === 'promoRepeat') promoRepeat = t.checked;
+    if (t.id === 'promoUnknown') { promoAud.includeUnknown = t.checked; refreshPromoPreview().catch(err => toast('⚠️ ' + err.message)); }
+    if (t.name === 'pam') { promoAud.mode = t.value; renderPromo(); }
+    if (t.dataset.pid) { const id = t.dataset.pid; promoAud.ids = t.checked ? [...new Set(promoAud.ids.concat(id))] : promoAud.ids.filter(x => x !== id); }
+    if (t.dataset.pg) { const id = t.dataset.pg; promoAud.groups = t.checked ? [...new Set(promoAud.groups.concat(id))] : promoAud.groups.filter(x => x !== id); }
+    if (t.id === 'promoFile') uploadPromoFile(t.files[0]).catch(err => toast('⚠️ ' + err.message));
   });
   $('tab-promo').addEventListener('click', async (e) => {
     const b = e.target.closest('button'); if (!b) return;
     if (b.dataset.pv) { promoView = b.dataset.pv; return renderPromo(); }
-    if (b.dataset.copt) { if (b.dataset.copt === 'stopped' && !confirm('Stop specials for this customer?')) return; await act('status', { promo: { op: 'opt', id: b.dataset.cid, status: b.dataset.copt } }, 'Updated'); return; }
+    if (b.dataset.pl) { promoList = b.dataset.pl; return renderPromo(); }
+    if (b.dataset.cedit) return customerSheet(b.dataset.cedit);
+    if (b.dataset.copt) { if (!canBlast()) return; if (b.dataset.copt === 'stopped' && !confirm('Stop specials for this customer?')) return; await act('status', { promo: { op: 'opt', id: b.dataset.cid, status: b.dataset.copt } }, 'Updated'); return; }
     if (b.dataset.pop) { await act('status', { promo: { op: b.dataset.pop, id: b.dataset.pid } }, b.dataset.pop); return; }
+    if (b.dataset.now) {
+      const go = (confirmClosed) => api('status', { promo: { op: 'sendNow', id: b.dataset.now, confirmClosed: !!confirmClosed } });
+      try { await go(false); toast('Sending now'); promoView = 'list'; await sync(true); }
+      catch (err) { if (/closed today/.test(err.message) && confirm('The shop is closed today. Send anyway?')) { try { await go(true); toast('Sending now'); await sync(true); } catch (e2) { toast('⚠️ ' + e2.message); } } else toast('⚠️ ' + err.message); }
+      return;
+    }
     if (b.dataset.pedit) {
       const p = (D.promo.promos || []).find(x => x.id === b.dataset.pedit); if (!p) return;
-      openSheet('<h3>Edit ' + esc(p.id) + '</h3><p class="muted small">You can change this until the first message goes out.</p><div class="field"><label>Message</label><textarea id="edBody" rows="4" maxlength="500">' + esc(p.body) + '</textarea></div><label class="small"><input type="checkbox" id="edSp"' + (p.sponsor ? ' checked' : '') + '> Add sponsor line</label><div class="field"><label>Sponsor line</label><input id="edSpText" maxlength="80" value="' + esc(p.sponsorText || promoSponsorText) + '"></div><div class="acts"><button class="btn" data-close>Cancel</button><button class="btn primary" id="edSave">Save</button></div>');
-      $('edSave').onclick = async () => { const j = await act('status', { promo: { op: 'edit', id: p.id, body: $('edBody').value, sponsor: $('edSp').checked, sponsorText: $('edSpText').value } }, 'Promo updated'); if (j) closeSheet(); };
+      openSheet('<h3>Edit ' + esc(p.id) + '</h3><div class="field"><label>Message</label><textarea id="edBody" rows="4" maxlength="500">' + esc(p.body) + '</textarea></div><label class="small"><input type="checkbox" id="edSp"' + (p.sponsor ? ' checked' : '') + '> Add sponsor line</label><div class="field"><label>Sponsor line</label><input id="edSpText" maxlength="80" value="' + esc(p.sponsorText || promoSponsorText) + '"></div><div class="field"><label>Send at (Guyana time)</label><input id="edWhen" type="datetime-local"></div><div class="acts"><button class="btn" data-close type="button">Cancel</button><button class="btn primary" id="edSave" type="button">Save</button></div>');
+      $('edSave').onclick = async () => { const j = await act('status', { promo: { op: 'edit', id: p.id, body: $('edBody').value, sponsor: $('edSp').checked, sponsorText: $('edSpText').value, sendLocal: $('edWhen').value || undefined } }, 'Promo updated'); if (j) closeSheet(); };
       return;
     }
     if (b.id === 'promoRefresh') { try { await refreshPromoPreview(); } catch (err) { toast('⚠️ ' + err.message); } return; }
     if (b.id === 'promoTest') {
       try { await refreshPromoPreview(); } catch (err) { return toast('⚠️ ' + err.message); }
-      openSheet('<h3>Send test to me?</h3><p>This sends <b>one TEST message</b> to the shop\'s own WhatsApp chat only. No customer gets it.</p><pre class="promo-preview">' + esc(promoPreview.text) + '</pre><div class="acts"><button class="btn" data-close>Cancel</button><button class="btn primary" id="doTest">Send test</button></div>');
-      $('doTest').onclick = async () => { $('doTest').disabled = true; const j = await act('status', { promo: { op: 'test', body: promoBody, sponsor: promoSponsor, sponsorText: promoSponsorText, image: promoImage } }, 'Test queued to the own chat'); if (j) { closeSheet(); promoView = 'progress'; } };
+      openSheet('<h3>Send test to me?</h3><p>One TEST message to the shop\'s own WhatsApp chat only. No customer gets it.</p><pre class="promo-preview">' + esc(promoPreview.text) + '</pre><div class="acts"><button class="btn" data-close type="button">Cancel</button><button class="btn primary" id="doTest" type="button">Send test</button></div>');
+      $('doTest').onclick = async () => { $('doTest').disabled = true; const j = await act('status', { promo: { op: 'test', body: promoBody, sponsor: promoSponsor, sponsorText: promoSponsorText, imageId: promoImageId } }, 'Test queued to the own chat'); if (j) { closeSheet(); promoView = 'list'; } };
       return;
     }
     if (b.id === 'promoSend') {
       try { await refreshPromoPreview(); } catch (err) { return toast('⚠️ ' + err.message); }
       const n = promoPreview.recipients;
-      openSheet('<h3>Send this promo?</h3><p>This will message <b>' + n + '</b> opted-in customer' + (n === 1 ? '' : 's') + '. Stopped customers, anyone who hasn\'t said yes, 592 712 2188 and this line are not included. Each message ends with "Reply STOP to stop".</p><pre class="promo-preview">' + esc(promoPreview.text) + '</pre><div class="acts"><button class="btn" data-close>Cancel</button><button class="btn red" id="doSend"' + (n ? '' : ' disabled') + '>Send to ' + n + '</button></div>');
-      $('doSend').onclick = async () => {
-        $('doSend').disabled = true;
-        const sendAt = promoWhen ? new Date(promoWhen).toISOString() : '';
-        const j = await act('status', { promo: { op: 'send', confirm: true, body: promoBody, sponsor: promoSponsor, sponsorText: promoSponsorText, image: promoImage, sendAt } }, n + ' queued');
-        if (j) { closeSheet(); promoView = 'progress'; }
+      const ex = excludedLine(promoPreview.excluded);
+      const closed = !!promoPreview.closed;
+      const go = (extra) => {
+        openSheet('<h3 id="promoConfirm">Send this promo?</h3><p><b>' + n + '</b> ' + (promoAud.includeUnknown ? 'people (including some who have not opted in)' : 'people') + ' will get it. ' + esc(ex) + (promoWhen ? ' Scheduled for ' + esc(promoWhen.replace('T', ' ')) + ' Guyana time.' : ' Starts as soon as the WhatsApp line is idle.') + (closed ? ' <b>That day is closed.</b>' : '') + '</p><pre class="promo-preview">' + esc(promoPreview.text) + '</pre><div class="acts"><button class="btn" data-close type="button">Cancel</button><button class="btn red" id="doSend" type="button"' + (n ? '' : ' disabled') + '>Send to ' + n + '</button></div>');
+        $('doSend').onclick = async () => {
+          $('doSend').disabled = true;
+          const j = await act('status', { promo: { op: 'send', confirm: true, confirmUnknown: !!promoAud.includeUnknown, confirmClosed: !!closed, body: promoBody, sponsor: promoSponsor, sponsorText: promoSponsorText, image: !!promoImageId, imageId: promoImageId, audience: audiencePayload(), sendLocal: promoWhen, repeat: promoRepeat ? 'weekly' : '' } }, n + ' queued');
+          if (j) { closeSheet(); promoView = 'list'; promoList = promoWhen ? 'upcoming' : 'upcoming'; }
+        };
       };
+      if (promoAud.includeUnknown) {
+        openSheet('<h3>Include people who have not opted in?</h3><p class="note">This can get the shared WhatsApp line <b>712 9487</b> blocked. Stopped customers and anyone who said no are still left out. It is written to the audit log.</p><div class="acts"><button class="btn" data-close type="button">Cancel</button><button class="btn red" id="doUnknown" type="button">I understand, continue</button></div>');
+        $('doUnknown').onclick = () => go(true);
+      } else go(false);
     }
   });
 
