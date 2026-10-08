@@ -4,10 +4,10 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Unruly Taste · Order Online (Demo)</title>
-<meta name="description" content="Unruly Taste, Alberttown, Georgetown: wings, combos, Hot Box and Wrap Box. Order on WhatsApp for pickup or delivery. DEMO page, sample menu.">
+<meta name="description" content="Unruly Taste, Alberttown, Georgetown: wings specials, Unruly Boxes, Hot Box, Wrap Box, fish specials, Rasta Pasta Fridays. Order on WhatsApp for pickup or delivery. DEMO page, sample menu.">
 <meta name="theme-color" content="#111111">
 <meta property="og:title" content="Unruly Taste · Order Online (Demo)">
-<meta property="og:description" content="Wings, combos, Hot Box & Wrap Box. Tap to order on WhatsApp. Pickup or delivery in Georgetown. Demo menu.">
+<meta property="og:description" content="Wings, Unruly Boxes, Hot Box, Wrap Box, fish specials & more. Tap to order on WhatsApp. Pickup or delivery in Georgetown. Demo menu.">
 <meta property="og:image" content="https://bbscalton.github.io/unruly-taste-demo/images/og-share.jpg">
 <meta property="og:image:type" content="image/jpeg">
 <meta property="og:image:width" content="1200">
@@ -41,16 +41,11 @@
     <div class="muted"><span class="pill soon">Opening Soon</span> Hours coming soon · 🏪 Pickup · 🛵 Delivery</div>
   </section>
 
-  <nav class="tabs" id="tabs" aria-label="Menu sections">
-    <button data-sec="deals" class="on">🔥 Deals</button>
-    <button data-sec="wings">🍗 Wings</button>
-    <button data-sec="combos">🍔 Combos</button>
-    <button data-sec="boxes">📦 Boxes</button>
-  </nav>
+  <nav class="tabs" id="tabs" aria-label="Menu sections"></nav>
 
   <div id="menu"></div>
 
-  <p class="fineprint">Prices in G$ (GYD). Delivery charges apply. Refreshers/milkshakes come with combo deals. <b>DEMO</b>: sample menu, prices subject to change.</p>
+  <p class="fineprint">Prices in G$ (GYD). Delivery charges apply. Sides G$1,500 a serving; drinks can be ordered on their own. Rasta Pasta is Fridays only. <b>DEMO</b>: sample menu, prices subject to change.</p>
 </main>
 
 <!-- sticky cart bar -->
@@ -62,7 +57,7 @@
 <div class="modal hidden" id="itemModal" role="dialog" aria-modal="true" aria-labelledby="itemTitle">
   <div class="sheet">
     <button class="x" data-close aria-label="Close">×</button>
-    <img id="itemImg" alt="" width="640" height="480">
+    <img id="itemImg" alt="" width="640" height="480"><div id="itemNoPhoto" class="hidden"></div>
     <div class="sheet-body">
       <h2 id="itemTitle"></h2>
       <p id="itemDesc" class="muted"></p>

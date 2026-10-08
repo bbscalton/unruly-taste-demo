@@ -32,3 +32,8 @@ generator and is no longer needed.
 
 To swap a photo: crop to 4:3, export ~800x600 WebP under 150 KB, then change `img:` on the item
 in `menu.js`.
+
+## 8 Oct 2026 menu update
+- `waffles-and-wings.webp`: cropped from the owner's real Facebook photo (wings & waffles, 30 Jul).
+- Items without a matching real photo show a "Photo coming soon" card (emoji + brand colours). No generated food photos.
+- Partial matches in use: `wings-with-side.webp` (wings + fries) for "Wings + Fries + Plantain/Wedges"; `burger-wings-combo.webp` for "Burger Combo".

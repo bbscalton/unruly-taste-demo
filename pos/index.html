@@ -16,12 +16,12 @@
   <div class="brand"><img class="logo" src="../images/logo.webp" alt="Unruly Taste" width="62" height="48"><div><b>Point of Sale</b><span id="syncState" class="sync">connecting…</span></div></div>
   <div class="top-acts"><button class="helpbtn" type="button" data-help title="Help &amp; FAQ" aria-label="Help and FAQ"><span>?</span><em>Help</em></button><button class="bell" id="bell" type="button" title="Low stock"><span>🔔</span><i id="bellCount" class="hidden">0</i></button></div>
 </header>
-<nav class="tabs" id="tabs">
-  <button data-tab="orders" class="on">🧾 <span>Orders</span><i id="openCount" class="cnt hidden"></i></button>
-  <button data-tab="walkin">💵 <span>Walk-in</span></button>
-  <button data-tab="stock">📦 <span>Stock</span><i id="lowCount" class="cnt warn hidden"></i></button>
-  <button data-tab="today">📊 <span>Today</span></button>
-  <button data-tab="settings">⚙️ <span>Settings</span></button>
+<nav class="tabs" id="tabs" aria-label="POS sections">
+  <button data-tab="orders" class="on" aria-current="page"><em class="ti" aria-hidden="true">🧾</em><span>Orders</span><i id="openCount" class="cnt hidden"></i></button>
+  <button data-tab="walkin"><em class="ti" aria-hidden="true">💵</em><span>Walk-in</span></button>
+  <button data-tab="stock"><em class="ti" aria-hidden="true">📦</em><span>Stock</span><i id="lowCount" class="cnt warn hidden"></i></button>
+  <button data-tab="today"><em class="ti" aria-hidden="true">📊</em><span>Today</span></button>
+  <button data-tab="settings"><em class="ti" aria-hidden="true">⚙️</em><span>Settings</span></button>
 </nav>
 <main>
   <section id="tab-orders" class="tab"></section>

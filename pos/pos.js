@@ -30,8 +30,12 @@
   const visible = (item, g, ch) => { if (!g.showIf) return true; const gi = item.groups.findIndex(x => x.key === g.showIf[0]); return ch[gi] === g.showIf[1]; };
   const FMT = {
     db: (v) => 'Box 1: ' + v.b1 + ' w/ ' + v.p1 + (v.f1 ? ' (' + v.f1 + ')' : '') + '; Box 2: ' + v.b2 + ' w/ ' + v.p2 + (v.f2 ? ' (' + v.f2 + ')' : ''),
-    mm: (v) => 'Hot Box w/ ' + v.hp + (v.hf ? ' (' + v.hf + ')' : '') + '; Wrap Box w/ ' + v.wp + (v.wf ? ' (' + v.wf + ')' : '') + '; 2 refreshers',
+    mm: (v) => 'Box 1: ' + v.b1 + ' w/ ' + v.p1 + (v.f1 ? ' (' + v.f1 + ')' : '') + '; Box 2: ' + v.b2 + ' w/ ' + v.p2 + (v.f2 ? ' (' + v.f2 + ')' : '') + '; Refreshers: ' + v.r1 + ' + ' + v.r2,
   };
+  // day-only items (Thursday / Friday deals, Rasta Pasta Fridays): gentle notice, never blocks the sale
+  const GYWD = () => ({ Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 })[new Intl.DateTimeFormat('en-US', { timeZone: CFG.TIME_ZONE || 'America/Guyana', weekday: 'short' }).format(new Date())];
+  const dayWarn = (it) => (it && it.day != null && GYWD() !== it.day ? it.dayName + 's only: today is ' + new Intl.DateTimeFormat('en-US', { timeZone: CFG.TIME_ZONE || 'America/Guyana', weekday: 'long' }).format(new Date()) + '. OK as a pre-order or if the owner allows it.' : '');
+  const thumb = (it) => it.img ? '<img src="../images/' + esc(it.img) + '" alt="" loading="lazy" width="640" height="480">' : '<span class="nophoto"><span class="np-i">' + esc(it.icon || '🍽️') + '</span><small>Photo coming soon</small></span>';
   function summary(item, ch) {
     if (!item.groups.length) return '';
     const v = {}; item.groups.forEach((g, i) => { v[g.key] = visible(item, g, ch) && ch[i] >= 0 ? g.opts[ch[i]] : ''; });
@@ -82,7 +86,7 @@
   $('tabs').addEventListener('click', (e) => { const b = e.target.closest('button[data-tab]'); if (b) setTab(b.dataset.tab); });
   $('bell').addEventListener('click', () => setTab('stock'));
   function setTab(t) {
-    tab = t; document.querySelectorAll('#tabs button').forEach(b => b.classList.toggle('on', b.dataset.tab === t));
+    tab = t; document.querySelectorAll('#tabs button').forEach(b => { const on = b.dataset.tab === t; b.classList.toggle('on', on); if (on) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current'); });
     document.querySelectorAll('.tab').forEach(s => s.classList.toggle('hidden', s.id !== 'tab-' + t));
     if (t !== 'settings') dirtySettings = false;
     renderAll(true); window.scrollTo(0, 0);
@@ -189,7 +193,7 @@
       const items = M.items.filter(i => i.sec === s.id); if (!items.length) continue;
       h += '<div class="sec-title">' + esc(s.title || s.name || s.id) + '</div><div class="grid">' + items.map(it => {
         const c = defaultCost(it);
-        return '<button class="item" data-item="' + it.id + '"><img src="../images/' + esc(it.img) + '" alt="" loading="lazy" width="640" height="480"><div class="ib"><b>' + esc(it.name) + '</b><div class="pr">' + (it.price ? money(it.price) : 'Price to confirm') + '</div>' +
+        return '<button class="item" data-item="' + it.id + '">' + thumb(it) + '<div class="ib"><b>' + esc(it.name) + '</b>' + (it.day != null ? ' <span class="tag ' + (dayWarn(it) ? 'ph' : 'ready') + '">' + esc(it.dayName) + 's</span>' : '') + '<div class="pr">' + (it.price ? money(it.price) : 'Price to confirm') + '</div>' +
           '<div class="mg">est. cost ' + money(c) + (it.price ? ' · margin ' + pct(it.price - c, it.price) : '') + '</div></div></button>';
       }).join('') + '</div>';
     }
@@ -202,7 +206,7 @@
     let h = '<h3>🧾 Ticket <span class="tag walk-in">Walk-in · cash</span></h3>';
     if (!ticket.length) h += '<p class="muted small">Tap menu items to add them.</p>';
     h += ticket.map((l, i) => { const c = lineCost(l.id, l.choices, l.qty).cost, lt = l.unit == null ? null : l.unit * l.qty;
-      return '<div class="tl"><b>' + l.qty + '×</b><div>' + esc(l.name) + (l.choices ? '<div class="muted small">' + esc(l.choices) + '</div>' : '') +
+      return '<div class="tl"><b>' + l.qty + '×</b><div>' + esc(l.name) + (l.choices ? '<div class="muted small">' + esc(l.choices) + '</div>' : '') + (dayWarn(byId(l.id)) ? '<div class="small neg">📅 ' + esc(byId(l.id).dayName) + 's only</div>' : '') +
         '<div class="small muted">cost ' + money(c) + (lt == null ? '' : ' · profit ' + pm(lt - c)) + (l.manual ? ' · manual price' : '') + '</div></div><div style="text-align:right"><b>' + (lt == null ? '–' : money(lt)) + '</b><br><button class="x" data-rm="' + i + '" title="Remove">✕</button></div></div>'; }).join('');
     h += '<div id="ttot"></div>';
     h += '<div class="field"><label>Customer name (optional)</label><input id="cName" maxlength="40" value="' + esc(custName) + '" placeholder="For calling out the order"></div>' +
@@ -239,7 +243,7 @@
     const draw = () => {
       it.groups.forEach((g, i) => { if (!visible(it, g, ch)) ch[i] = -1; });
       const sum = summary(it, ch), c = lineCost(it.id, sum, qty).cost, unit = it.price != null ? it.price : (+price || null), lt = unit == null ? null : unit * qty;
-      let h = '<h3>' + esc(it.name) + '</h3><p class="muted small">' + esc(it.desc || '') + '</p>';
+      let h = '<h3>' + esc(it.name) + '</h3><p class="muted small">' + esc(it.desc || '') + '</p>' + (dayWarn(it) ? '<div class="note">📅 ' + esc(dayWarn(it)) + '</div>' : '');
       it.groups.forEach((g, i) => { if (!visible(it, g, ch)) return; h += '<div class="field"><label>' + esc(g.label) + '</label><div class="opts">' + g.opts.map((o, k) => '<button class="opt ' + (ch[i] === k ? 'on' : '') + '" data-g="' + i + '" data-k="' + k + '">' + esc(o) + '</button>').join('') + '</div></div>'; });
       if (it.price == null) h += '<div class="field"><label>Price per box (G$): price to confirm, enter what you charge</label><input id="mp" type="number" inputmode="numeric" min="1" value="' + esc(price) + '" placeholder="e.g. 3000"></div>';
       h += '<div class="field"><label>Quantity</label><div class="qty"><button data-qd="-1">−</button><b>' + qty + '</b><button data-qd="1">+</button></div></div>' +
