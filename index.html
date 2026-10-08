@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Unruly Taste · Order Online (Demo)</title>
+<meta name="description" content="Unruly Taste, Alberttown, Georgetown: wings, combos, Hot Box and Wrap Box. Order on WhatsApp for pickup or delivery. DEMO page, sample menu.">
+<meta name="theme-color" content="#111111">
+<meta property="og:title" content="Unruly Taste · Order Online (Demo)">
+<meta property="og:description" content="Wings, combos, Hot Box & Wrap Box. Tap to order on WhatsApp. Pickup or delivery in Georgetown. Demo menu.">
+<meta property="og:image" content="https://bbscalton.github.io/unruly-taste-demo/images/og-share.png">
+<meta property="og:url" content="https://bbscalton.github.io/unruly-taste-demo/">
+<meta property="og:type" content="website">
+<link rel="icon" href="images/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="demo-banner" role="note"><b>DEMO</b> · sample menu, prices subject to change · orders go to a test WhatsApp line</div>
+
+<header>
+  <div class="brand">
+    <div class="wordmark" aria-label="Unruly Taste"><span class="w1">UNRULY</span><span class="w2">TASTE</span></div>
+    <p>Wings · Combos · Boxes · Alberttown, Georgetown</p>
+  </div>
+  <div class="hactions">
+    <a class="hbtn" id="callBtn" href="#">📞 Call</a>
+    <a class="hbtn wa" id="waBtn" href="#" target="_blank" rel="noopener">WhatsApp</a>
+  </div>
+</header>
+
+<main id="shop">
+  <section class="hero">
+    <img src="images/hero-spread.svg" alt="Wings, burger, fries and waffles (demo illustration)" width="640" height="480">
+    <div class="hero-text">
+      <span class="pill soon">Opening Soon</span>
+      <h1>Tap. Order. Get it <span class="hl">Unruly</span>.</h1>
+      <p>Pick your food below, then send the order straight to WhatsApp. Pickup, takeout or delivery.</p>
+      <div class="chips"><span>🛵 Delivery</span><span>🥡 Takeout</span><span>🏪 In-store pickup</span></div>
+    </div>
+  </section>
+
+  <section class="info card">
+    <div><b>📍 5th Street, Alberttown</b><br><span class="muted">between Light &amp; Albert Street, Georgetown, Guyana</span></div>
+    <div><b>🕒 Hours coming soon</b><br><span class="muted">We'll post opening hours here.</span></div>
+    <div><b>📸 @unruly_taste</b><br><span class="muted">on Instagram</span></div>
+    <div class="intro muted">Started by young entrepreneur <b>Johntel</b>. "Unruly Taste" is also the name of our signature dish.</div>
+  </section>
+
+  <nav class="tabs" id="tabs" aria-label="Menu sections">
+    <button data-sec="deals" class="on">🔥 Deals</button>
+    <button data-sec="wings">🍗 Wings</button>
+    <button data-sec="combos">🍔 Combos</button>
+    <button data-sec="boxes">📦 Boxes</button>
+  </nav>
+
+  <div id="menu"></div>
+
+  <p class="fineprint">All prices in Guyana dollars (G$). Delivery charges apply and are confirmed on WhatsApp. Refreshers and milkshakes come with combo deals only. This is a <b>DEMO</b> page: sample menu, prices subject to change. Food images are demo illustrations, not actual photos.</p>
+</main>
+
+<!-- sticky cart bar -->
+<button id="cartBar" class="cartbar hidden" type="button">
+  <span><b id="cartCount">0</b> item(s) · View order</span><span id="cartTotalBar">G$0</span>
+</button>
+
+<!-- item options sheet -->
+<div class="modal hidden" id="itemModal" role="dialog" aria-modal="true" aria-labelledby="itemTitle">
+  <div class="sheet">
+    <button class="x" data-close aria-label="Close">×</button>
+    <img id="itemImg" alt="" width="640" height="480">
+    <div class="sheet-body">
+      <h2 id="itemTitle"></h2>
+      <p id="itemDesc" class="muted"></p>
+      <div id="itemDay" class="daynote hidden"></div>
+      <div id="itemGroups"></div>
+      <div class="qtyrow"><span>Quantity</span>
+        <div class="stepper"><button type="button" id="qMinus" aria-label="Less">−</button><b id="qVal">1</b><button type="button" id="qPlus" aria-label="More">+</button></div>
+      </div>
+      <div class="msgline" id="itemErr"></div>
+      <button class="big" id="addBtn" type="button">Add to order</button>
+    </div>
+  </div>
+</div>
+
+<!-- cart + checkout sheet -->
+<div class="modal hidden" id="cartModal" role="dialog" aria-modal="true" aria-labelledby="cartTitle">
+  <div class="sheet">
+    <button class="x" data-close aria-label="Close">×</button>
+    <div class="sheet-body">
+      <h2 id="cartTitle">Your order</h2>
+      <div id="cartLines"></div>
+      <div class="totalrow"><span>Total</span><b id="cartTotal">G$0</b></div>
+      <p class="note">+ delivery charge if delivered (confirmed on WhatsApp).</p>
+
+      <form id="checkout" novalidate>
+        <h3>Your details</h3>
+        <label for="cName">Your name *</label>
+        <input type="text" id="cName" autocomplete="name" placeholder="e.g. Shania Persaud" maxlength="60">
+        <label for="cPhone">Your WhatsApp number * <span class="muted">(we send your receipt here)</span></label>
+        <input type="tel" id="cPhone" autocomplete="tel" inputmode="tel" value="+592 " placeholder="+592 600 1234" maxlength="22">
+        <div class="hint" id="phoneHint">Guyana numbers: just type the 7 digits after +592. Other countries: start with + and the country code.</div>
+
+        <h3>Pickup or delivery?</h3>
+        <div class="seg" role="radiogroup">
+          <label><input type="radio" name="ful" value="pickup" checked> 🏪 Pickup</label>
+          <label><input type="radio" name="ful" value="delivery"> 🛵 Delivery</label>
+        </div>
+        <div id="pickupInfo" class="note">Pick up at 5th Street, Alberttown (between Light &amp; Albert St), Georgetown.</div>
+        <div id="deliveryBox" class="hidden">
+          <label for="cAddr">Delivery address *</label>
+          <textarea id="cAddr" rows="2" maxlength="200" placeholder="House/lot, street, village/ward"></textarea>
+          <label for="cLandmark">Landmark (optional)</label>
+          <input type="text" id="cLandmark" maxlength="80" placeholder="e.g. opposite the school">
+          <div class="note">Delivery charges apply. Unruly Taste will confirm the delivery fee on WhatsApp.</div>
+        </div>
+        <label for="cNote">Note for the kitchen (optional)</label>
+        <input type="text" id="cNote" maxlength="140" placeholder="e.g. extra sauce, no pepper">
+        <div class="msgline" id="checkoutErr"></div>
+        <button class="big wa" id="placeBtn" type="submit">Send order on WhatsApp</button>
+        <p class="note">Tapping the button opens WhatsApp with your order filled in. Tap <b>Send</b> in WhatsApp to place it. Pay on pickup/delivery.</p>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- confirmation screen -->
+<section id="done" class="hidden">
+  <div class="card done">
+    <div class="tick">✓</div>
+    <h2>Almost done: send it in WhatsApp</h2>
+    <p>Your order <b id="doneNo"></b> is ready in WhatsApp. <b>Tap Send</b> there to place it.</p>
+    <a class="big wa" id="doneWa" href="#" target="_blank" rel="noopener">Open WhatsApp &amp; send order</a>
+    <h3>Your receipt</h3>
+    <pre id="receiptText" class="receipt"></pre>
+    <div class="btnrow">
+      <button type="button" class="sbtn" id="copyReceipt">📋 Copy receipt</button>
+      <button type="button" class="sbtn" id="saveReceipt">💾 Save receipt</button>
+      <button type="button" class="sbtn hidden" id="shareReceipt">📤 Share to my WhatsApp</button>
+      <button type="button" class="sbtn" id="copyReorder">🔁 Copy reorder link</button>
+    </div>
+    <p class="note">Unruly Taste also sends this receipt to your WhatsApp number once they get your order. To order the same again later, open the reorder link in the receipt.</p>
+    <button type="button" class="big ghost" id="newOrder">Start a new order</button>
+  </div>
+</section>
+
+<div id="toast" class="toast hidden" role="status"></div>
+
+<footer>
+  <div class="wordmark small"><span class="w1">UNRULY</span><span class="w2">TASTE</span></div>
+  <p>5th Street, Alberttown, Georgetown, Guyana · Instagram @unruly_taste</p>
+  <p class="muted">Demo ordering page built by Neuereatec Enterprise. Not yet live for Unruly Taste.</p>
+</footer>
+
+<script src="config.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
