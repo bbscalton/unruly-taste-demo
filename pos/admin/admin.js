@@ -101,7 +101,7 @@
     catch (e) { $('view').innerHTML = '<div class="note">' + esc(e.message) + '</div>'; return; }
     $('view').innerHTML = '<h2>Staff &amp; PINs</h2><p class="muted small">Only the owner sees this. PINs are stored hashed. Changing a PIN signs that person out.</p>' +
       '<div class="card"><div class="scroll"><table class="t"><tr><th>Name</th><th>Role</th><th></th></tr>' +
-      users.map((u) => '<tr><td>' + esc(u.name) + (u.disabled ? ' <span class="tag collected">off</span>' : '') + '</td><td>' + esc(u.role) + '</td><td><button class="btn sm" data-upin="' + esc(u.id) + '" type="button">New PIN</button></td></tr>').join('') +
+      users.map((u) => '<tr><td>' + esc(u.name) + (u.disabled ? ' <span class="tag collected">off</span>' : '') + '</td><td>' + esc(u.role) + '</td><td><button class="btn sm" data-upin="' + esc(u.id) + '" type="button">New PIN</button> ' + (u.role === 'owner' ? '' : (u.disabled ? '<button class="btn sm" data-uon="' + esc(u.id) + '" type="button">Turn back on</button>' : '<button class="btn sm" data-uoff="' + esc(u.id) + '" data-uname="' + esc(u.name) + '" type="button" style="background:#b3261e;color:#fff">Remove</button>')) + '</td></tr>').join('') +
       '</table></div><h3>Add manager or staff</h3><div class="field"><label>Name</label><input id="nuName" maxlength="40"></div><div class="field"><label>Role</label><select id="nuRole" style="width:auto"><option value="staff">staff</option><option value="manager">manager</option></select></div><div class="field"><label>PIN (8+ characters)</label><input id="nuPin" type="password" autocomplete="new-password"></div><button class="btn" id="nuAdd" type="button">Add user</button></div>';
   }
 
@@ -229,6 +229,15 @@
       if (b.id === 'nuAdd') {
         const j = await api('status', { admin: { op: 'user-add', name: $('nuName').value, role: $('nuRole').value, pin: $('nuPin').value } });
         toast('User added'); return renderStaff();
+      }
+      if (b.dataset.uoff) {
+        if (!confirm('Remove ' + (b.dataset.uname || 'this user') + '? Their PIN stops working right away. Their history stays in the Activity log, and you can turn them back on later.')) return;
+        await api('status', { admin: { op: 'user-disable', id: b.dataset.uoff, disabled: true } });
+        toast('User removed'); return renderStaff();
+      }
+      if (b.dataset.uon) {
+        await api('status', { admin: { op: 'user-disable', id: b.dataset.uon, disabled: false } });
+        toast('User turned back on'); return renderStaff();
       }
       if (b.dataset.upin) {
         const pin = prompt('New PIN (8+ characters). The old PIN stops working.');
