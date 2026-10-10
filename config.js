@@ -21,5 +21,5 @@ window.UT_CONFIG = {
   CURRENCY: 'G$',
   // AI order assistant behind the header "Call" (voice) and "WhatsApp" (text chat) buttons. Public API path only, no keys here.
   // Set to '' to make the two buttons go back to a plain phone call / WhatsApp link.
-  ASSISTANT_API: 'https://payments.neuereatec.org/api/web'
+  ASSISTANT_API: 'https://gdb.neuereatec.org/unruly/api'
 };
