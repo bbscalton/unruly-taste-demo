@@ -107,10 +107,8 @@
         <input type="text" id="cNote" maxlength="140" placeholder="e.g. extra sauce, no pepper">
         <div class="msgline" id="checkoutErr"></div>
         <h3>Payment</h3>
-        <div class="seg" role="radiogroup" aria-label="Payment">
+        <div class="seg" role="radiogroup" aria-label="Payment" id="payBox">
           <label><input type="radio" name="pay" value="pay-on-pickup" checked> 💵 Pay on pickup / delivery (cash)</label>
-          <label class="muted" title="Coming soon"><input type="radio" name="pay" value="mmg" disabled> MMG (soon)</label>
-          <label class="muted" title="Coming soon"><input type="radio" name="pay" value="card" disabled> Card (soon)</label>
         </div>
         <button class="big wa" id="placeBtn" type="submit">Buy · place order</button>
         <p class="note">Your order goes straight to the Unruly Taste kitchen and you get an order number. Pay when you collect.</p>
@@ -143,9 +141,9 @@
 
 <footer><img class="logo small" src="images/logo.webp" alt="Unruly Taste" width="57" height="44" loading="lazy"><p>5th Street, Alberttown, Georgetown · Demo page by Neuereatec</p></footer>
 
-<script src="config.js?v=20261012"></script>
+<script src="config.js?v=20261012b"></script>
 <script src="menu.js"></script>
-<script src="app.js?v=20261012"></script>
+<script src="app.js?v=20261012b"></script>
 <script src="assistant.js"></script>
 </body>
 </html>

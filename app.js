@@ -403,6 +403,13 @@
   var cust = store('ut_cust');
   if (cust) { $('cName').value = cust.name || ''; $('cPhone').value = cust.phone || '+592 '; }
   renderMenu();
+  // Extra payment methods (e.g. MMG) appear ONLY when the shop server reports them enabled. Today: none, cash only.
+  if (C.ORDER_API) fetch(C.ORDER_API.replace(/\/order$/, '/payment-methods'), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })
+    .then(function (r) { return r.json(); }).then(function (j) {
+      (j.methods || []).filter(function (m) { return m.id !== 'pay-on-pickup' && m.id !== 'cash'; }).forEach(function (m) {
+        var l = document.createElement('label'); l.innerHTML = '<input type="radio" name="pay" value="' + esc(m.id) + '"> ' + esc(m.label); $('payBox').appendChild(l);
+      });
+    }).catch(function () {});
 
   var params = new URLSearchParams(location.search);
   if (params.has('reorder')) {
