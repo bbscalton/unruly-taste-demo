@@ -21,5 +21,7 @@ window.UT_CONFIG = {
   CURRENCY: 'G$',
   // AI order assistant behind the header "Call" (voice) and "WhatsApp" (text chat) buttons. Public API path only, no keys here.
   // Set to '' to make the two buttons go back to a plain phone call / WhatsApp link.
-  ASSISTANT_API: 'https://gdb.neuereatec.org/unruly/api'
+  ASSISTANT_API: 'https://gdb.neuereatec.org/unruly/api',
+  // Buy button: the order is sent to the shop POS here (12 Oct 2026). Set to '' to go back to the old "send on WhatsApp" checkout.
+  ORDER_API: 'https://unruly.neuereatec.org/api/web/order'
 };
